@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -16,12 +17,12 @@ type user struct {
 
 var users = []user{}
 
-func newUser (username string) *user {
-	user := user {
-		Name: username,
-		Token: uuid.New(),
+func newUser(username string) *user {
+	user := user{
+		Name:       username,
+		Token:      uuid.New(),
 		LastAccess: time.Now()}
-	
+
 	return &user
 }
 
@@ -30,7 +31,7 @@ func getAuthToken(c *gin.Context) {
 
 	for _, u := range users {
 		if u.Name == username {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "username taken"})
+			c.IndentedJSON(http.StatusConflict, gin.H{"message": "username taken"})
 			return
 		}
 	}
@@ -40,9 +41,25 @@ func getAuthToken(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, newu)
 }
 
+func extendSession(c *gin.Context) {
+	token := c.Param("token")
+
+	for _, u := range users {
+		if u.Token.String() == token {
+			u.LastAccess = time.Now()
+			c.IndentedJSON(http.StatusOK, u)
+			log.Println("Users: ", users)
+			return
+		}
+	}
+
+	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "username taken"})
+}
+
 func main() {
 	router := gin.Default()
-	router.GET("/auth/:username", getAuthToken)
+	router.POST("/newSession/:username", getAuthToken)
+	router.POST("/extendSession/:token", extendSession)
 
 	router.Run("localhost:8080")
 }
