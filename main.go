@@ -17,8 +17,7 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-// make thread safe
-// launch goroutine that checks for expired users periodically from main
+// TODO: give up, do postgres
 var usermux = &sync.RWMutex{}
 var users = []user{}
 
