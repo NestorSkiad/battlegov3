@@ -19,12 +19,11 @@ type userlist []user
 
 var users = userlist{}
 
-// implement method to remove item from slice
 func (u userlist) remove(s int) userlist {
 	return append(u[:s], u[s+1:]...)
 }
 
-func (u userlist) checkExpiry(i int) bool {
+func (u userlist) checkExpiryAndDelete(i int) bool {
 	if u[i].LastAccess.Add(time.Minute * 10).Before(time.Now()) {
 		u.remove(i)
 		return true
@@ -61,11 +60,11 @@ func extendSession(c *gin.Context) {
 
 	for i, u := range users {
 		if u.Token.String() == token {
-			if users.checkExpiry(i) {
+			if users.checkExpiryAndDelete(i) {
 				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
+				return
 			}
 
-			// add condition to remove user if expired
 			users[i].LastAccess = time.Now()
 			c.IndentedJSON(http.StatusOK, users[i])
 			log.Println("User updated: ", users[i])
