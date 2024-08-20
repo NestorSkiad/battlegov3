@@ -4,11 +4,9 @@ import (
 	"log"
 	"net/http"
 	"time"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/vonage/gosrvlib/pkg/threadsafe/tsslice"
 )
 
 type user struct {
@@ -17,8 +15,6 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-// TODO: give up, do postgres
-var usermux = &sync.RWMutex{}
 var users = []user{}
 
 func newUser(username string) *user {
@@ -41,16 +37,15 @@ func postUsers(c *gin.Context) {
 	}
 
 	newu := newUser(username)
-	tsslice.Append(usermux, &users, *newu)
+	users = append(users, *newu)
 	c.IndentedJSON(http.StatusCreated, newu)
 }
 
 func extendSession(c *gin.Context) {
 	token := c.Param("token")
 
-	usermux.Lock()
 	for i, u := range users {
-		if u.Token.String() == token { // add condition to remove user if expired (and cleanup hasn't gotten to them yet)
+		if u.Token.String() == token { // add condition to remove user if expired
 			users[i].LastAccess = time.Now()
 			c.IndentedJSON(http.StatusOK, users[i])
 			log.Println("User updated: ", users[i])
