@@ -15,7 +15,22 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-var users = []user{}
+type userlist []user
+
+var users = userlist{}
+
+// implement method to remove item from slice
+func (u userlist) remove(s int) userlist {
+	return append(u[:s], u[s+1:]...)
+}
+
+func (u userlist) checkExpiry(i int) bool {
+	if u[i].LastAccess.Add(time.Minute * 10).Before(time.Now()) {
+		u.remove(i)
+		return true
+	}
+	return false
+}
 
 func newUser(username string) *user {
 	user := user{
@@ -45,7 +60,12 @@ func extendSession(c *gin.Context) {
 	token := c.Param("token")
 
 	for i, u := range users {
-		if u.Token.String() == token { // add condition to remove user if expired
+		if u.Token.String() == token {
+			if users.checkExpiry(i) {
+				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
+			}
+
+			// add condition to remove user if expired
 			users[i].LastAccess = time.Now()
 			c.IndentedJSON(http.StatusOK, users[i])
 			log.Println("User updated: ", users[i])
