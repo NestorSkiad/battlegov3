@@ -15,6 +15,8 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
+// make thread safe
+// launch goroutine that checks for expired users periodically from main
 var users = []user{}
 
 func newUser(username string) *user {
@@ -45,7 +47,7 @@ func extendSession(c *gin.Context) {
 	token := c.Param("token")
 
 	for i, u := range users {
-		if u.Token.String() == token {
+		if u.Token.String() == token { // add condition to remove user if expired (and cleanup hasn't gotten to them yet)
 			users[i].LastAccess = time.Now()
 			c.IndentedJSON(http.StatusOK, users[i])
 			log.Println("User updated: ", users[i])
