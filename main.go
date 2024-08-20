@@ -44,11 +44,11 @@ func postUsers(c *gin.Context) {
 func extendSession(c *gin.Context) {
 	token := c.Param("token")
 
-	for _, u := range users {
+	for i, u := range users {
 		if u.Token.String() == token {
-			u.LastAccess = time.Now()
-			c.IndentedJSON(http.StatusOK, u)
-			log.Println("Users: ", users)
+			users[i].LastAccess = time.Now()
+			c.IndentedJSON(http.StatusOK, users[i])
+			log.Println("User updated: ", users[i])
 			return
 		}
 	}
