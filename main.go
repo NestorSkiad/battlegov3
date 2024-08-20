@@ -26,7 +26,7 @@ func newUser(username string) *user {
 	return &user
 }
 
-func getAuthToken(c *gin.Context) {
+func postUsers(c *gin.Context) {
 	username := c.Param("username")
 
 	for _, u := range users {
@@ -58,7 +58,7 @@ func extendSession(c *gin.Context) {
 
 func main() {
 	router := gin.Default()
-	router.POST("/newSession/:username", getAuthToken)
+	router.POST("/newSession/:username", postUsers)
 	router.POST("/extendSession/:token", extendSession)
 
 	router.Run("localhost:8080")
