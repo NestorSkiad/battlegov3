@@ -17,14 +17,14 @@ type user struct {
 
 type userlist []user
 
-var users = userlist{}
+var users = &userlist{}
 
-func (u userlist) remove(s int) userlist {
-	return append(u[:s], u[s+1:]...)
+func (u *userlist) remove(s int) userlist {
+	return append((*u)[:s], (*u)[s+1:]...)
 }
 
-func (u userlist) checkExpiryAndDelete(i int) bool {
-	if u[i].LastAccess.Add(time.Minute * 10).Before(time.Now()) {
+func (u *userlist) checkExpiryAndDelete(i int) bool {
+	if (*u)[i].LastAccess.Add(time.Minute * 10).Before(time.Now()) {
 		u.remove(i)
 		return true
 	}
@@ -43,7 +43,7 @@ func newUser(username string) *user {
 func postUsers(c *gin.Context) {
 	username := c.Param("username")
 
-	for _, u := range users {
+	for _, u := range *users {
 		if u.Name == username {
 			c.IndentedJSON(http.StatusConflict, gin.H{"message": "username taken"})
 			return
@@ -51,23 +51,23 @@ func postUsers(c *gin.Context) {
 	}
 
 	newu := newUser(username)
-	users = append(users, *newu)
+	*users = append(*users, *newu)
 	c.IndentedJSON(http.StatusCreated, newu)
 }
 
 func extendSession(c *gin.Context) {
 	token := c.Param("token")
 
-	for i, u := range users {
+	for i, u := range *users {
 		if u.Token.String() == token {
 			if users.checkExpiryAndDelete(i) {
 				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
 				return
 			}
 
-			users[i].LastAccess = time.Now()
-			c.IndentedJSON(http.StatusOK, users[i])
-			log.Println("User updated: ", users[i])
+			(*users)[i].LastAccess = time.Now()
+			c.IndentedJSON(http.StatusOK, (*users)[i])
+			log.Println("User updated: ", (*users)[i])
 			return
 		}
 	}
