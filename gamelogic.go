@@ -105,11 +105,13 @@ func shipAtCoords(board *Board, x, y int) bool {
 }
 
 func newBoardFromRandom() (*Board, error) {
-	dim := rand.Int31n(5) + 8
+	dim := rand.Intn(5) + 8
 
-	ships := []*Ship{}
+	board := Board{dim, dim, []*Ship{}}
 
 	for i := 0; i < 3; i++ {
+		startx := rand.Intn(dim)
+		starty := rand.Intn(dim)
 		
 	}
 }
