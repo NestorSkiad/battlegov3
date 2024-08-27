@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
-	"net/http"
 	"math/rand"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -107,11 +107,18 @@ func shipAtCoords(board *Board, x, y int) bool {
 func newBoardFromRandom() (*Board, error) {
 	dim := rand.Intn(5) + 8
 
-	board := Board{dim, dim, []*Ship{}}
+	board, _ := newBoard(dim, dim)
 
 	for i := 0; i < 3; i++ {
 		startx := rand.Intn(dim)
 		starty := rand.Intn(dim)
-		
+
+		// do a switch here
+		// choice := rant.Intn(3)
+		// case 0: north, etc
+
+		// well, this is going to produce errors if I just randomise all the coords and directions
+		// if it does, just i-- and carry on
+
 	}
 }
