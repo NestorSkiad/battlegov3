@@ -36,6 +36,7 @@ const (
 
 type Ship struct {
 	startx, starty, endx, endy int
+	dir                        Direction
 }
 
 func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction, c *gin.Context) (int, int, error) {
@@ -73,8 +74,18 @@ func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction, c *
 }
 
 type Board struct {
+	w, h  int
+	ships []*Ship
 }
 
-func newBoard(w, h int, s ...Ship) {
+func newBoard(w, h int, ships ...*Ship) (*Board, error) {
+	outOfBoundsError := errors.New("ship is out of bounds")
 
+	for _, ship := range ships {
+		if (ship.startx >= w) || (ship.startx < 0) || (ship.starty >= h) || (ship.endy < 0) || (ship.endx >= w) || (ship.endx < 0) || (ship.endy >= h) || (ship.endy < 0) {
+			return nil, outOfBoundsError
+		}
+	}
+
+	return &Board{w, h, ships}, nil
 }
