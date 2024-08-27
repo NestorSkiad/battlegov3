@@ -97,8 +97,11 @@ func shipAtCoords(board *Board, x, y int) bool {
 	}
 
 	for _, ship := range board.ships {
-
+		if (x >= ship.startx) && (x <= ship.endx) && (y >= ship.starty) && (y <= ship.endy) {
+			return true
+		}
 	}
+	return false
 }
 
 func newBoardFromRandom() (*Board, error) {
