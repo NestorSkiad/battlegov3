@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"math/rand"
 
 	"github.com/gin-gonic/gin"
 )
@@ -82,10 +83,30 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 	outOfBoundsError := errors.New("ship is out of bounds")
 
 	for _, ship := range ships {
-		if (ship.startx >= w) || (ship.startx < 0) || (ship.starty >= h) || (ship.endy < 0) || (ship.endx >= w) || (ship.endx < 0) || (ship.endy >= h) || (ship.endy < 0) {
+		if (ship.startx >= w) || (ship.startx < 0) || (ship.starty >= h) || (ship.starty < 0) || (ship.endx >= w) || (ship.endx < 0) || (ship.endy >= h) || (ship.endy < 0) {
 			return nil, outOfBoundsError
 		}
 	}
 
 	return &Board{w, h, ships}, nil
+}
+
+func shipAtCoords(board *Board, x, y int) bool {
+	if (x >= board.w) || (y >= board.h) {
+		return false
+	}
+
+	for _, ship := range board.ships {
+
+	}
+}
+
+func newBoardFromRandom() (*Board, error) {
+	dim := rand.Int31n(5) + 8
+
+	ships := []*Ship{}
+
+	for i := 0; i < 3; i++ {
+		
+	}
 }
