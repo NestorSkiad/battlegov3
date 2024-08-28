@@ -35,12 +35,19 @@ const (
 	West  Direction = true
 )
 
+var directions = []Direction{North, South, East, West}
+
 type Ship struct {
 	startx, starty, endx, endy int
 	dir                        Direction
 }
 
-func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction, c *gin.Context) (int, int, error) {
+type Board struct {
+	w, h  int
+	ships []*Ship
+}
+
+func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (int, int, error) {
 	outOfBoundsError := errors.New("ship is out of bounds")
 
 	switch dir {
@@ -70,13 +77,7 @@ func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction, c *
 		}
 	}
 
-	c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "something went badly wrong while building a board"})
-	return 0, 0, errors.New("")
-}
-
-type Board struct {
-	w, h  int
-	ships []*Ship
+	return 0, 0, errors.New("somehow found a new direction")
 }
 
 func newBoard(w, h int, ships ...*Ship) (*Board, error) {
@@ -90,6 +91,8 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 
 	return &Board{w, h, ships}, nil
 }
+
+// func addShip
 
 func shipAtCoords(board *Board, x, y int) bool {
 	if (x >= board.w) || (y >= board.h) {
@@ -113,12 +116,13 @@ func newBoardFromRandom() (*Board, error) {
 		startx := rand.Intn(dim)
 		starty := rand.Intn(dim)
 
-		// do a switch here
-		// choice := rant.Intn(3)
-		// case 0: north, etc
+		direction := directions[rand.Intn(len(directions))]
 
-		// well, this is going to produce errors if I just randomise all the coords and directions
-		// if it does, just i-- and carry on
+		if endx, endy, err := getEndCoords(startx, starty, dim, dim, 3, direction); err != nil {
+			i--;
+			continue
+		}
 
+		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
 }
