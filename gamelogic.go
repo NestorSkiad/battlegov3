@@ -3,9 +3,6 @@ package main
 import (
 	"errors"
 	"math/rand"
-	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
 // possible use: secondary index for Boat pointers (won't have to linear check for boats given coords)
@@ -81,7 +78,7 @@ func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (in
 	return 0, 0, errors.New("somehow found a new direction")
 }
 
-func newShip(startx, starty, endx, endy int, direction Direction) (*Ship) {
+func newShip(startx, starty, endx, endy int, direction Direction) *Ship {
 	return &Ship{startx, starty, endx, endy, direction}
 }
 
@@ -133,12 +130,11 @@ func newBoardFromRandom() (*Board, error) {
 
 		// maybe randomise ship length
 		if endx, endy, err := getEndCoords(startx, starty, board.w, board.h, 3, direction); err != nil {
-			i--;
+			i--
 			continue
 		} else {
 			ship := newShip(startx, starty, endx, endy, direction)
 		}
-		
 
 		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
