@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// boilerplate 5ever
+// possible use: secondary index for Boat pointers (won't have to linear check for boats given coords)
 type Matrix[T any] struct {
 	w, h int
 	data []T
@@ -26,6 +26,7 @@ func (m Matrix[T]) Set(x, y int, t T) {
 	m.data[y*m.w+x] = t
 }
 
+// type system shenanigans
 type Direction bool
 
 const (
@@ -80,6 +81,10 @@ func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (in
 	return 0, 0, errors.New("somehow found a new direction")
 }
 
+func newShip(startx, starty, endx, endy int, direction Direction) (*Ship) {
+	return &Ship{startx, starty, endx, endy, direction}
+}
+
 func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 	outOfBoundsError := errors.New("ship is out of bounds")
 
@@ -126,10 +131,14 @@ func newBoardFromRandom() (*Board, error) {
 
 		direction := directions[rand.Intn(len(directions))]
 
-		if endx, endy, err := getEndCoords(startx, starty, dim, dim, 3, direction); err != nil {
+		// maybe randomise ship length
+		if endx, endy, err := getEndCoords(startx, starty, board.w, board.h, 3, direction); err != nil {
 			i--;
 			continue
+		} else {
+			ship := newShip(startx, starty, endx, endy, direction)
 		}
+		
 
 		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
