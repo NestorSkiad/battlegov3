@@ -93,6 +93,14 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 }
 
 // func addShip
+func addShip(board *Board, ship *Ship) error {
+	if ship.startx >= board.w || ship.endx >= board.w || ship.starty >= board.h || ship.endy >= board.h {
+		return errors.New("tried to add ship into out of bounds")
+	}
+
+	board.ships = append(board.ships, ship)
+	return nil
+}
 
 func shipAtCoords(board *Board, x, y int) bool {
 	if (x >= board.w) || (y >= board.h) {
