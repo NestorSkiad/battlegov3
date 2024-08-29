@@ -135,7 +135,10 @@ func newBoardFromRandom() (*Board, error) {
 			continue
 		}
 
-		ship := newShip(startx, starty, endx, endy, direction)\
+		ship := newShip(startx, starty, endx, endy, direction)
+		addShip(board, ship)
 		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
+
+	return board, nil;
 }
