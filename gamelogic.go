@@ -129,13 +129,13 @@ func newBoardFromRandom() (*Board, error) {
 		direction := directions[rand.Intn(len(directions))]
 
 		// maybe randomise ship length
-		if endx, endy, err := getEndCoords(startx, starty, board.w, board.h, 3, direction); err != nil {
+		endx, endy, err := getEndCoords(startx, starty, board.w, board.h, 3, direction)
+		if err != nil {
 			i--
 			continue
-		} else {
-			ship := newShip(startx, starty, endx, endy, direction)
 		}
 
+		ship := newShip(startx, starty, endx, endy, direction)\
 		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
 }
