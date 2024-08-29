@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -60,33 +61,42 @@ func postUsers(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, newu)
 }
 
-func extendSession(c *gin.Context) {
+func extendSession(c *gin.Context) (*user, error) {
 	token, exists := c.GetPostForm("token")
 
 	if token == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no token supplied"})
-		return
+		return nil, errors.New("no token supplied")
 	}
 
 	for i, u := range users {
 		if u.Token.String() == token {
 			if users.checkExpiryAndDelete(i) {
 				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
-				return
+				return nil, errors.New("token expired")
 			}
 
 			users[i].LastAccess = time.Now()
 			c.IndentedJSON(http.StatusOK, users[i])
 			log.Println("User updated: ", users[i])
-			return
+			return &users[i], nil
 		}
 	}
 
-	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "username taken"})
+	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "incorrect token"})
+	return nil, errors.New("incorrect token")
 }
 
-// todo: put extendSession in its own method, then extendSessionRequest serves the request and gives back a response
-// call extendSesssion from joinLobby
+func extendSessionRequest(c *gin.Context) {
+	username, err := extendSession(c)
+
+	if err != nil {
+		return
+	}
+	c.IndentedJSON(http.StatusOK, username)
+}
+
+// todo: call extendSesssion from joinLobby
 func joinLobby(c *gin.Context) {
 	token, exists := c.GetPostForm("token")
 
@@ -113,7 +123,7 @@ func joinLobby(c *gin.Context) {
 func main() {
 	router := gin.Default()
 	router.POST("/newSession/:username", postUsers)
-	router.POST("/extendSession/:token", extendSession)
+	router.POST("/extendSession/:token", extendSessionRequest)
 	router.POST("/joinLobby/:token", joinLobby)
 
 	router.Run("localhost:8080")
