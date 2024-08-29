@@ -85,10 +85,36 @@ func extendSession(c *gin.Context) {
 	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "username taken"})
 }
 
+// todo: put extendSession in its own method, then extendSessionRequest serves the request and gives back a response
+// call extendSesssion from joinLobby
+func joinLobby(c *gin.Context) {
+	token, exists := c.GetPostForm("token")
+
+	if token == "" || !exists {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no token supplied"})
+		return
+	}
+
+	for i, u := range users {
+		if u.Token.String() == token {
+			if users.checkExpiryAndDelete(i) {
+				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
+				return
+			}
+
+			users[i].LastAccess = time.Now()
+			c.IndentedJSON(http.StatusOK, users[i])
+			log.Println("User updated: ", users[i])
+			return
+		}
+	}
+}
+
 func main() {
 	router := gin.Default()
 	router.POST("/newSession/:username", postUsers)
 	router.POST("/extendSession/:token", extendSession)
+	router.POST("/joinLobby/:token", joinLobby)
 
 	router.Run("localhost:8080")
 }
