@@ -86,7 +86,7 @@ func extendSession(c *gin.Context) (*user, error) {
 		}
 	}
 
-	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "incorrect token"})
+	c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "incorrect token"})
 	return nil, errors.New("incorrect token")
 }
 
@@ -101,8 +101,14 @@ func extendSessionRequest(c *gin.Context) {
 
 // todo: call extendSesssion from joinLobby
 func joinLobby(c *gin.Context) {
-	if _, err := extendSession(c); err != nil {
+	user, err := extendSession(c)
+
+	if err != nil {
 		return
+	}
+
+	if lobby.Cardinality() == 0 {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found"})
 	}
 }
 
@@ -116,10 +122,13 @@ func hostMatch(c *gin.Context) {
 	if lobby.Contains(user) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user already trying to host match"})
 	}
+
+	lobby.Add(user)
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "user now looking for other players"})
 }
 
 func unhostMatch(c *gin.Context) {
-	
+
 }
 
 func main() {
