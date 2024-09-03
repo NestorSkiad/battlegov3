@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/deckarep/golang-set/v2"
 )
 
 type user struct {
@@ -19,6 +20,8 @@ type user struct {
 type userlist []user
 
 var users = userlist{}
+
+var lobby = mapset.NewSet[*user]()
 
 func (u userlist) remove(s int) userlist {
 	return append(u[:s], u[s+1:]...)
@@ -98,14 +101,26 @@ func extendSessionRequest(c *gin.Context) {
 
 // todo: call extendSesssion from joinLobby
 func joinLobby(c *gin.Context) {
-	user, err := extendSession(c)
-}
-
-func hostMatch(c *gin.Context) {
 	if _, err := extendSession(c); err != nil {
 		return
 	}
-} 
+}
+
+func hostMatch(c *gin.Context) {
+	user, err := extendSession(c)
+
+	if err != nil {
+		return
+	}
+
+	if lobby.Contains(user) {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user already trying to host match"})
+	}
+}
+
+func unhostMatch(c *gin.Context) {
+	
+}
 
 func main() {
 	router := gin.Default()
@@ -113,6 +128,7 @@ func main() {
 	router.POST("/extendSession/:token", extendSessionRequest)
 	router.POST("/joinLobby/:token", joinLobby)
 	router.POST("/hostMatch/:token", hostMatch)
+	router.DELETE("/hostmatch/:token", unhostMatch)
 
 	router.Run("localhost:8080")
 }
