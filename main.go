@@ -108,7 +108,10 @@ func joinLobby(c *gin.Context) {
 
 	if lobby.Cardinality() == 0 {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found"})
+		return
 	}
+	
+	//todo: nightmare logic
 }
 
 func hostMatch(c *gin.Context) {
@@ -120,6 +123,7 @@ func hostMatch(c *gin.Context) {
 
 	if lobby.Contains(user) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user already trying to host match"})
+		return
 	}
 
 	lobby.Add(user)
