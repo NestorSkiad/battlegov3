@@ -96,10 +96,9 @@ func extendSessionRequest(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	c.IndentedJSON(http.StatusOK, user) //check if deref needed
+	c.IndentedJSON(http.StatusOK, user) //check if deref needed. also, all uses of user in response messages are probably borked and I might need to do a tostring function
 }
 
-// todo: call extendSesssion from joinLobby
 func joinLobby(c *gin.Context) {
 	user, err := extendSession(c)
 
@@ -128,7 +127,18 @@ func hostMatch(c *gin.Context) {
 }
 
 func unhostMatch(c *gin.Context) {
+	user, err := extendSession(c)
 
+	if err != nil {
+		return
+	}
+
+	if ! lobby.Contains(user) {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
+	}
+
+	lobby.Remove(user)
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
 func main() {
