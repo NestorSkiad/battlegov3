@@ -88,43 +88,31 @@ func extendSession(c *gin.Context) (*user, error) {
 }
 
 func extendSessionRequest(c *gin.Context) {
-	username, err := extendSession(c)
+	user, err := extendSession(c)
 
 	if err != nil {
 		return
 	}
-	c.IndentedJSON(http.StatusOK, username)
+	c.IndentedJSON(http.StatusOK, user) //check if deref needed
 }
 
 // todo: call extendSesssion from joinLobby
 func joinLobby(c *gin.Context) {
-	token, exists := c.GetPostForm("token")
+	user, err := extendSession(c)
+}
 
-	if token == "" || !exists {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no token supplied"})
+func hostMatch(c *gin.Context) {
+	if _, err := extendSession(c); err != nil {
 		return
 	}
-
-	for i, u := range users {
-		if u.Token.String() == token {
-			if users.checkExpiryAndDelete(i) {
-				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
-				return
-			}
-
-			users[i].LastAccess = time.Now()
-			c.IndentedJSON(http.StatusOK, users[i])
-			log.Println("User updated: ", users[i])
-			return
-		}
-	}
-}
+} 
 
 func main() {
 	router := gin.Default()
 	router.POST("/newSession/:username", postUsers)
 	router.POST("/extendSession/:token", extendSessionRequest)
 	router.POST("/joinLobby/:token", joinLobby)
+	router.POST("/hostMatch/:token", hostMatch)
 
 	router.Run("localhost:8080")
 }
