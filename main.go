@@ -44,6 +44,12 @@ func newUser(username string) *user {
 	return &user
 }
 
+type match struct {
+	id uuid.UUID
+	host *user
+	guest *user
+}
+
 func postUsers(c *gin.Context) {
 	username, exists := c.GetPostForm("username")
 
@@ -110,6 +116,8 @@ func joinLobby(c *gin.Context) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found"})
 		return
 	}
+
+
 	
 	//todo: nightmare logic
 }
