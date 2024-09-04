@@ -171,9 +171,10 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	endv := &Env{db: dbpool}
+	env := &Env{db: dbpool}
 
 	// todo: needs fixing. but don't fix yet. make schema first
+	// todo: do user side first, then schema for matches, then matches logic changes, then schema for games, etc etc
 	router := gin.Default()
 	router.POST("/newSession/:username", postUsers)
 	router.POST("/extendSession/:token", extendSessionRequest)
