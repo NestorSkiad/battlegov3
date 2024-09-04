@@ -5,11 +5,17 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"context"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/deckarep/golang-set/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// to be changed for prod
+var dbURL = "postgres://postgres:admin@localhost:5432/postgres"
 
 type user struct {
 	Name       string    `json:"name"`
@@ -161,6 +167,22 @@ func main() {
 	router.POST("/joinLobby/:token", joinLobby)
 	router.POST("/hostMatch/:token", hostMatch)
 	router.DELETE("/hostmatch/:token", unhostMatch)
+
+	dbpool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		log.Printf("Unable to create connection pool: %v\n", err)
+		os.Exit(1)
+	}
+	defer dbpool.Close()
+
+	var greeting string
+	err = dbpool.QueryRow(context.Background(), "select 'Hello, world!'").Scan(&greeting)
+	if err != nil {
+		log.Printf("QueryRow failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println(greeting)
 
 	router.Run("localhost:8080")
 }
