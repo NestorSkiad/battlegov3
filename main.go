@@ -1,27 +1,32 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
-	"time"
-	"context"
 	"os"
+	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/deckarep/golang-set/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // to be changed for prod
 var dbURL = "postgres://postgres:admin@localhost:5432/postgres"
 
+// https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
+
+type Env struct {
+	db *pgxpool.Pool
+}
+
 type user struct {
 	Name       string    `json:"name"`
 	Token      uuid.UUID `json:"token"`
 	LastAccess time.Time `json:"lastAccess"`
-
 }
 
 type userlist []user
@@ -52,8 +57,8 @@ func newUser(username string) *user {
 }
 
 type match struct {
-	ID uuid.UUID
-	Host *user
+	ID    uuid.UUID
+	Host  *user
 	Guest *user
 }
 
@@ -124,8 +129,6 @@ func joinLobby(c *gin.Context) {
 		return
 	}
 
-
-	
 	//todo: nightmare logic
 }
 
@@ -152,7 +155,7 @@ func unhostMatch(c *gin.Context) {
 		return
 	}
 
-	if ! lobby.Contains(user) {
+	if !lobby.Contains(user) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
 	}
 
@@ -161,13 +164,6 @@ func unhostMatch(c *gin.Context) {
 }
 
 func main() {
-	router := gin.Default()
-	router.POST("/newSession/:username", postUsers)
-	router.POST("/extendSession/:token", extendSessionRequest)
-	router.POST("/joinLobby/:token", joinLobby)
-	router.POST("/hostMatch/:token", hostMatch)
-	router.DELETE("/hostmatch/:token", unhostMatch)
-
 	dbpool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
 		log.Printf("Unable to create connection pool: %v\n", err)
@@ -175,14 +171,15 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	var greeting string
-	err = dbpool.QueryRow(context.Background(), "select 'Hello, world!'").Scan(&greeting)
-	if err != nil {
-		log.Printf("QueryRow failed: %v\n", err)
-		os.Exit(1)
-	}
+	endv := &Env{db: dbpool}
 
-	log.Println(greeting)
+	// todo: needs fixing. but don't fix yet. make schema first
+	router := gin.Default()
+	router.POST("/newSession/:username", postUsers)
+	router.POST("/extendSession/:token", extendSessionRequest)
+	router.POST("/joinLobby/:token", joinLobby)
+	router.POST("/hostMatch/:token", hostMatch)
+	router.DELETE("/hostmatch/:token", unhostMatch)
 
 	router.Run("localhost:8080")
 }
