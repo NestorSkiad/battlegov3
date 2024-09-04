@@ -29,8 +29,36 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-func (e *Env) RemoveUser(s int) error {
-	e.db.Execute()
+var sqlError = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
+
+func (e *Env) RemoveUser(username string, c *gin.Context) error {
+	tx, err := e.db.Begin(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+    	return err
+	}
+
+	defer tx.Rollback(context.Background())
+	
+	_, err = tx.Exec(context.Background(), "DELETE FROM tokens WHERE username = $1", username)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+    	return err
+	}
+
+	_, err = tx.Exec(context.Background(), "DELETE FROM users WHERE username = $1", username)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+    	return err
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+    	return err
+	}
+
+	return nil
 }
 
 func (u userlist) checkExpiryAndDelete(i int) bool {
@@ -142,7 +170,7 @@ func hostMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user now looking for other players"})
 }
 
-func unhostMatch(c *gin.Context) {
+func (e *Env) unhostMatch(c *gin.Context) {
 	user, err := extendSession(c)
 
 	if err != nil {
@@ -153,7 +181,7 @@ func unhostMatch(c *gin.Context) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
 	}
 
-	lobby RemoveUser(user)
+	e.RemoveUser(user)
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
