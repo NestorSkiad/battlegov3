@@ -15,6 +15,7 @@ type user struct {
 	Name       string    `json:"name"`
 	Token      uuid.UUID `json:"token"`
 	LastAccess time.Time `json:"lastAccess"`
+
 }
 
 type userlist []user
@@ -45,9 +46,9 @@ func newUser(username string) *user {
 }
 
 type match struct {
-	id uuid.UUID
-	host *user
-	guest *user
+	ID uuid.UUID
+	Host *user
+	Guest *user
 }
 
 func postUsers(c *gin.Context) {
