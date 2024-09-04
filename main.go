@@ -29,19 +29,13 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-type userlist []user
-
-var users = userlist{}
-
-var lobby = mapset.NewSet[*user]()
-
-func (u userlist) remove(s int) userlist {
-	return append(u[:s], u[s+1:]...)
+func (e *Env) RemoveUser(s int) error {
+	e.db.Execute()
 }
 
 func (u userlist) checkExpiryAndDelete(i int) bool {
 	if u[i].LastAccess.Add(time.Minute * 10).Before(time.Now()) {
-		u.remove(i)
+		u.RemoveUser(i)
 		return true
 	}
 	return false
@@ -159,7 +153,7 @@ func unhostMatch(c *gin.Context) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
 	}
 
-	lobby.Remove(user)
+	lobby RemoveUser(user)
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
