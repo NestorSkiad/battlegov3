@@ -5,8 +5,10 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS tokens (
-    username REFERENCES users(username) PRIMARY KEY,
+    username REFERENCES users(username),
     token uuid NOT NULL,
-    lastaccess timestamptz DEFAULT current_timestamp
+    lastaccess timestamptz DEFAULT current_timestamp,
+    PRIMARY KEY(username, token),
+    UNIQUE(username)
 );
 

@@ -11,6 +11,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,7 +36,7 @@ func (e *Env) RemoveUser(username string, c *gin.Context) error {
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-    	return err
+		return err
 	}
 
 	defer tx.Rollback(context.Background())
@@ -43,7 +44,7 @@ func (e *Env) RemoveUser(username string, c *gin.Context) error {
 	_, err = tx.Exec(context.Background(), "DELETE FROM tokens WHERE username = $1", username)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-    	return err
+		return err
 	}
 
 	_, err = tx.Exec(context.Background(), "DELETE FROM users WHERE username = $1", username)
@@ -55,18 +56,32 @@ func (e *Env) RemoveUser(username string, c *gin.Context) error {
 	err = tx.Commit(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-    	return err
+		return err
 	}
 
 	return nil
 }
 
-func (u userlist) checkExpiryAndDelete(i int) bool {
-	if u[i].LastAccess.Add(time.Minute * 10).Before(time.Now()) {
-		u.RemoveUser(i)
-		return true
+func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
+	// todo: and token has expired
+	rows, err := e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 RETURNING username", token)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		return false, err
 	}
-	return false
+
+	username, err := pgx.CollectOneRow(rows, pgx.RowTo[string])
+	if err != nil { // works but maybe refactor
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return false, nil
+		default:
+			c.IndentedJSON(http.StatusInternalServerError, sqlError)
+			return false, err
+		}
+	}
+
+	return true, e.RemoveUser(username, c)
 }
 
 func newUser(username string) *user {
@@ -114,7 +129,7 @@ func extendSession(c *gin.Context) (*user, error) {
 
 	for i, u := range users {
 		if u.Token.String() == token {
-			if users.checkExpiryAndDelete(i) {
+			if users.C(i) {
 				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
 				return nil, errors.New("token expired")
 			}
