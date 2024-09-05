@@ -32,6 +32,7 @@ type user struct {
 
 var sqlError = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
 
+// TODO: don't return errors from routing functions. they are the baseline
 func (e *Env) RemoveUser(username string, c *gin.Context) error {
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
@@ -178,7 +179,7 @@ func joinLobby(c *gin.Context) {
 		return
 	}
 
-	//todo: nightmare logic
+	//TODO: nightmare logic
 }
 
 func hostMatch(c *gin.Context) {
@@ -220,12 +221,11 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	env := &Env{db: dbpool}
-
-	// todo: needs fixing. but don't fix yet. make schema first
-	// todo: do user side first, then schema for matches, then matches logic changes, then schema for games, etc etc
+	// FIXME: but don't fix yet. make schema first
+	// TODO: do user side first, then schema for matches, then matches logic changes, then schema for games, etc etc
 	router := gin.Default()
-	router.POST("/user/:username", postUsers)
+	env := &Env{db: dbpool}
+	router.POST("/user/:username", env.postUsers) // FIXME: router functions can't return errors
 	router.POST("/extendSession/:token", extendSessionRequest)
 	router.POST("/joinLobby/:token", joinLobby)
 	router.POST("/hostMatch/:token", hostMatch)
