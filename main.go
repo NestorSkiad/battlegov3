@@ -63,8 +63,7 @@ func (e *Env) RemoveUser(username string, c *gin.Context) error {
 }
 
 func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
-	// todo: and token has expired
-	rows, err := e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 RETURNING username", token)
+	rows, err := e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 AND NOW() - lastaccess > INTERVAL '10 minutes' RETURNING username", token)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
 		return false, err
