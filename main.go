@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// to be changed for prod
-var dbURL = "postgres://postgres:admin@localhost:5432/postgres"
+// to be changed to env var for "prod"
+const dbURL = "postgres://postgres:admin@localhost:5432/postgres"
 
 // https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
 
@@ -29,13 +29,14 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-var sqlError = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
+var sqlErrorMessage = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
+var sqlError = errors.New("SQL Error")
 
 // TODO: don't return errors from routing functions. they are the baseline
 func (e *Env) RemoveUser(username string, c *gin.Context) {
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
@@ -43,29 +44,30 @@ func (e *Env) RemoveUser(username string, c *gin.Context) {
 
 	_, err = tx.Exec(context.Background(), "DELETE FROM tokens WHERE username = $1", username)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
 	_, err = tx.Exec(context.Background(), "DELETE FROM users WHERE username = $1", username)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
 	err = tx.Commit(context.Background())
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
 	return
 }
 
+// TODO: check if token exists first, assume expired if it doesn't
 func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
 	rows, err := e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 AND NOW() - lastaccess > INTERVAL '10 minutes' RETURNING username", token)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return false, err
 	}
 
@@ -75,7 +77,7 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 		case errors.Is(err, pgx.ErrNoRows):
 			return false, nil
 		default:
-			c.IndentedJSON(http.StatusInternalServerError, sqlError)
+			c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 			return false, err
 		}
 	}
@@ -108,7 +110,7 @@ func (e *Env) postUsers(c *gin.Context) {
 	rows, err := e.db.Query(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username)
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
@@ -119,7 +121,7 @@ func (e *Env) postUsers(c *gin.Context) {
 
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
@@ -128,49 +130,60 @@ func (e *Env) postUsers(c *gin.Context) {
 	newu := newUser(username)
 	_, err = tx.Exec(context.Background(), "INSERT INTO users (username) VALUES ($1)", newu.Name)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
-	// TODO: insert to tokens table here, use newu
+	_, err = tx.Exec(context.Background(), "INSERT INTO tokens (username, token, lastaccess) VALUES ($1, $2, $3)", newu.Name, newu.Token, newu.LastAccess)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
 
 	err = tx.Commit(context.Background())
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
-	c.IndentedJSON(http.StatusCreated, gin.H{"message": "user created"}) // TODO: reply with token lmao
+	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token, "message": "user created"})
 }
 
-func extendSession(c *gin.Context) (*user, error) {
+var MissingTokenError = errors.New("no token supplied")
+var ExpiredTokenError = errors.New("token expired")
+var InvalidTokenError = errors.New("token invalid")
+
+func (e *Env) extendSession(c *gin.Context) error {
 	token, exists := c.GetPostForm("token")
 
 	if token == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no token supplied"})
-		return nil, errors.New("no token supplied")
+		return MissingTokenError
 	}
 
-	for i, u := range users {
-		if u.Token.String() == token {
-			if users.C(i) {
-				c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
-				return nil, errors.New("token expired")
-			}
-
-			users[i].LastAccess = time.Now()
-			c.IndentedJSON(http.StatusOK, users[i])
-			log.Println("User updated: ", users[i])
-			return &users[i], nil
-		}
+	tokenUUID, err := uuid.Parse(token)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "token not UUID"})
+		return err
 	}
 
-	c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "incorrect token"})
-	return nil, errors.New("incorrect token")
+	expired, err := e.CheckExpiryAndDelete(tokenUUID, c)
+	if err != nil {
+		return err
+	}
+
+	if expired {
+		c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
+		return ExpiredTokenError
+	}
+
+	// TODO: if token hasn't expired, extend session
+
+	return nil
 }
 
-func extendSessionRequest(c *gin.Context) {
-	user, err := extendSession(c)
+func (e *Env) extendSessionRequest(c *gin.Context) {
+	err := e.extendSession(c)
 
 	if err != nil {
 		return
