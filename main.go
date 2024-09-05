@@ -83,13 +83,11 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 	return true, e.RemoveUser(username, c)
 }
 
-func newUser(username string) *user {
-	user := user{
+func newUser(username string) user {
+	return user{
 		Name:       username,
 		Token:      uuid.New(),
 		LastAccess: time.Now()}
-
-	return &user
 }
 
 type match struct {
@@ -98,24 +96,39 @@ type match struct {
 	Guest *user
 }
 
-func postUsers(c *gin.Context) {
+func (e *Env) postUsers(c *gin.Context) error {
 	username, exists := c.GetPostForm("username")
 
 	if username == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no username supplied"})
-		return
+		return nil
 	}
 
-	for _, u := range users {
-		if u.Name == username {
-			c.IndentedJSON(http.StatusConflict, gin.H{"message": "username taken"})
-			return
-		}
+	rows, err := e.db.Query(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username)
+	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		return err
 	}
 
+	if matches > 0 {
+		c.IndentedJSON(http.StatusConflict, gin.H{"message": "username taken"})
+		return nil
+	}
+
+	// make transaction
 	newu := newUser(username)
-	users = append(users, *newu)
-	c.IndentedJSON(http.StatusCreated, newu)
+
+	_, err = e.db.Exec(context.Background(), "INSERT INTO users (username) VALUES ($1)", newu.Name)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+    	return err
+	}
+
+	// insert to tokens table here
+
+	c.IndentedJSON(http.StatusCreated, gin.H{"message": "user created"})
+	return nil
 }
 
 func extendSession(c *gin.Context) (*user, error) {
@@ -212,7 +225,7 @@ func main() {
 	// todo: needs fixing. but don't fix yet. make schema first
 	// todo: do user side first, then schema for matches, then matches logic changes, then schema for games, etc etc
 	router := gin.Default()
-	router.POST("/newSession/:username", postUsers)
+	router.POST("/user/:username", postUsers)
 	router.POST("/extendSession/:token", extendSessionRequest)
 	router.POST("/joinLobby/:token", joinLobby)
 	router.POST("/hostMatch/:token", hostMatch)
