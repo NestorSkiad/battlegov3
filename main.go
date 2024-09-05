@@ -15,7 +15,12 @@ import (
 )
 
 // to be changed to env var for "prod"
-const dbURL = "postgres://postgres:admin@localhost:5432/postgres"
+const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
+var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
+var sqlError 		  = errors.New("SQL Error")
+var MissingTokenError = errors.New("no token supplied")
+var ExpiredTokenError = errors.New("token expired")
+var InvalidTokenError = errors.New("token invalid")
 
 // https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
 
@@ -29,8 +34,18 @@ type user struct {
 	LastAccess time.Time `json:"lastAccess"`
 }
 
-var sqlErrorMessage = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
-var sqlError = errors.New("SQL Error")
+func newUser(username string) user {
+	return user{
+		Name:       username,
+		Token:      uuid.New(),
+		LastAccess: time.Now()}
+}
+
+type match struct {
+	ID    uuid.UUID
+	Host  *user
+	Guest *user
+}
 
 // TODO: don't return errors from routing functions. they are the baseline
 func (e *Env) RemoveUser(username string, c *gin.Context) {
@@ -63,16 +78,27 @@ func (e *Env) RemoveUser(username string, c *gin.Context) {
 	return
 }
 
-// TODO: check if token exists first, assume expired if it doesn't
 func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
-	rows, err := e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 AND NOW() - lastaccess > INTERVAL '10 minutes' RETURNING username", token)
+	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM tokens WHERE token = $1", token.String())
+	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return false, err
+	}
+
+	if matches == 0 {
+		c.IndentedJSON(http.StatusForbidden, gin.H{"message": "token doesn't exist"})
+		return true, nil
+	}
+
+	rows, err = e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 AND NOW() - lastaccess > INTERVAL '10 minutes' RETURNING username", token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return false, err
 	}
 
 	username, err := pgx.CollectOneRow(rows, pgx.RowTo[string])
-	if err != nil { // works but maybe refactor
+	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			return false, nil
@@ -86,19 +112,6 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 	return true, nil
 }
 
-func newUser(username string) user {
-	return user{
-		Name:       username,
-		Token:      uuid.New(),
-		LastAccess: time.Now()}
-}
-
-type match struct {
-	ID    uuid.UUID
-	Host  *user
-	Guest *user
-}
-
 func (e *Env) postUsers(c *gin.Context) {
 	username, exists := c.GetPostForm("username")
 
@@ -107,7 +120,7 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
-	rows, err := e.db.Query(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username)
+	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username)
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -149,10 +162,6 @@ func (e *Env) postUsers(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token, "message": "user created"})
 }
 
-var MissingTokenError = errors.New("no token supplied")
-var ExpiredTokenError = errors.New("token expired")
-var InvalidTokenError = errors.New("token invalid")
-
 func (e *Env) extendSession(c *gin.Context) error {
 	token, exists := c.GetPostForm("token")
 
@@ -177,24 +186,20 @@ func (e *Env) extendSession(c *gin.Context) error {
 		return ExpiredTokenError
 	}
 
-	// TODO: if token hasn't expired, extend session
-
-	return nil
+	_, err = e.db.Exec(context.Background(), "UPDATE tokens SET lastaccess = NOW() WHERE token = $1", token)
+	return err
 }
 
 func (e *Env) extendSessionRequest(c *gin.Context) {
-	err := e.extendSession(c)
-
-	if err != nil {
+	if err := e.extendSession(c); err != nil {
 		return
 	}
-	c.IndentedJSON(http.StatusOK, user) //check if deref needed. also, all uses of user in response messages are probably borked and I might need to do a tostring function
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "session extended"})
 }
 
-func joinLobby(c *gin.Context) {
-	user, err := extendSession(c)
-
-	if err != nil {
+func (e *Env) joinLobby(c *gin.Context) {
+	if err := e.extendSession(c); err != nil {
 		return
 	}
 
