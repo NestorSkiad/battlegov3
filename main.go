@@ -153,6 +153,8 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
+	// TODO: initialize user status
+
 	err = tx.Commit(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -209,6 +211,9 @@ func (e *Env) joinLobby(c *gin.Context) {
 	}
 
 	//TODO: nightmare logic
+	// get number of users in hosting status
+	// if none, return... resource unavailable?
+	// if some, get one random host, change status of both users to playing, put them in match
 }
 
 func hostMatch(c *gin.Context) {
