@@ -210,10 +210,12 @@ func (e *Env) joinLobby(c *gin.Context) {
 		return
 	}
 
-	//TODO: nightmare logic
+	// TODO:
 	// get number of users in hosting status
 	// if none, return... resource unavailable?
 	// if some, get one random host, change status of both users to playing, put them in match
+	// match should be in memory, use a thread safe map
+	// I guess get/match should return a redirect if on the wrong server, match table should store IP
 }
 
 func hostMatch(c *gin.Context) {
@@ -260,8 +262,8 @@ func main() {
 	router := gin.Default()
 	env := &Env{db: dbpool}
 	router.POST("/user/:username", env.postUsers) // FIXME: router functions can't return errors
-	router.POST("/extendSession/:token", extendSessionRequest)
-	router.POST("/joinLobby/:token", joinLobby)
+	router.POST("/extendSession/:token", env.extendSessionRequest)
+	router.POST("/joinLobby/:token", env.joinLobby)
 	router.POST("/hostMatch/:token", hostMatch)
 	router.DELETE("/hostmatch/:token", unhostMatch)
 
