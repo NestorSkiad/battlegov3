@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -33,34 +32,34 @@ type user struct {
 var sqlError = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
 
 // TODO: don't return errors from routing functions. they are the baseline
-func (e *Env) RemoveUser(username string, c *gin.Context) error {
+func (e *Env) RemoveUser(username string, c *gin.Context) {
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-		return err
+		return
 	}
 
 	defer tx.Rollback(context.Background())
-	
+
 	_, err = tx.Exec(context.Background(), "DELETE FROM tokens WHERE username = $1", username)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-		return err
+		return
 	}
 
 	_, err = tx.Exec(context.Background(), "DELETE FROM users WHERE username = $1", username)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-    	return err
+		return
 	}
 
 	err = tx.Commit(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
 func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
@@ -81,7 +80,8 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 		}
 	}
 
-	return true, e.RemoveUser(username, c)
+	e.RemoveUser(username, c)
+	return true, nil
 }
 
 func newUser(username string) user {
@@ -97,39 +97,50 @@ type match struct {
 	Guest *user
 }
 
-func (e *Env) postUsers(c *gin.Context) error {
+func (e *Env) postUsers(c *gin.Context) {
 	username, exists := c.GetPostForm("username")
 
 	if username == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no username supplied"})
-		return nil
+		return
 	}
 
 	rows, err := e.db.Query(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username)
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-		return err
+		return
 	}
 
 	if matches > 0 {
 		c.IndentedJSON(http.StatusConflict, gin.H{"message": "username taken"})
-		return nil
+		return
 	}
 
-	// make transaction
-	newu := newUser(username)
-
-	_, err = e.db.Exec(context.Background(), "INSERT INTO users (username) VALUES ($1)", newu.Name)
+	tx, err := e.db.Begin(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlError)
-    	return err
+		return
 	}
 
-	// insert to tokens table here
+	defer tx.Rollback(context.Background())
 
-	c.IndentedJSON(http.StatusCreated, gin.H{"message": "user created"})
-	return nil
+	newu := newUser(username)
+	_, err = tx.Exec(context.Background(), "INSERT INTO users (username) VALUES ($1)", newu.Name)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		return
+	}
+
+	// TODO: insert to tokens table here, use newu
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlError)
+		return
+	}
+
+	c.IndentedJSON(http.StatusCreated, gin.H{"message": "user created"}) // TODO: reply with token lmao
 }
 
 func extendSession(c *gin.Context) (*user, error) {
