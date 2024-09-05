@@ -113,7 +113,7 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 }
 
 func (e *Env) postUsers(c *gin.Context) {
-	username, exists := c.GetPostForm("username")
+	username, exists := c.GetPostForm("username") // TODO: check username length
 
 	if username == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no username supplied"})
