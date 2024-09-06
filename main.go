@@ -230,7 +230,8 @@ func (e *Env) extendSessionRequest(c *gin.Context) {
 }
 
 func (e *Env) joinLobby(c *gin.Context) {
-	if token, err := e.extendSession(c); err != nil {
+	token, err := e.extendSession(c)
+	if err != nil {
 		return
 	}
 
@@ -263,8 +264,16 @@ func (e *Env) joinLobby(c *gin.Context) {
 		return
 	}
 
-	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", )
+	guestname, err := e.getUser(token, c)
+	if err != nil {
+		return
+	}
 
+	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", guestname, hostname)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
 	// TODO:
 	// --get number of users in hosting status
 	// --if none, return... resource unavailable?
