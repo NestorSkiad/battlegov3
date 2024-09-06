@@ -249,12 +249,12 @@ func (e *Env) joinLobby(c *gin.Context) {
 
 	rows, _ = e.db.Query(context.Background(), `
 		SELECT
-			username
+			t.username
 		FROM
 			user_status AS us,
 			tokens AS t
 		WHERE us.user_status = $1
-			AND NOW() - lastaccess < INTERVAL '10 minutes'
+			AND NOW() - t.lastaccess < INTERVAL '10 minutes'
 		ORDER BY RANDOM()
 		LIMIT 1
 		`, "hosting")
