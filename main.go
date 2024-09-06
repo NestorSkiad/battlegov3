@@ -268,15 +268,13 @@ func main() {
 	}
 	defer dbpool.Close()
 
-	// FIXME: but don't fix yet. make schema first
-	// TODO: do user side first, then schema for matches, then matches logic changes, then schema for games, etc etc
 	router := gin.Default()
 	env := &Env{db: dbpool}
 	router.POST("/user/:username", env.postUsers) // FIXME: router functions can't return errors
-	router.POST("/extendSession/:token", env.extendSessionRequest)
+	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
 	router.POST("/joinLobby/:token", env.joinLobby)
-	router.POST("/hostMatch/:token", hostMatch)
-	router.DELETE("/hostmatch/:token", unhostMatch)
+	router.POST("/hostMatch/:token", env.hostMatch)
+	router.DELETE("/hostmatch/:token",env.unhostMatch)
 
 	router.Run("localhost:8080")
 }
