@@ -14,13 +14,13 @@ CREATE TABLE IF NOT EXISTS tokens (
 
 CREATE TABLE IF NOT EXISTS user_status (
     username REFERENCES users(username) PRIMARY KEY ON DELETE CASCADE,
-    user_status REFERENCES user_status_types(user_status),
+    user_status REFERENCES user_status_types(status_type),
     game_id REFERENCES games(game_id) DEFAULT NULL ON DELETE SET NULL,
     PRIMARY KEY(username)
 );
 
 CREATE TABLE IF NOT EXISTS user_status_types (
-    user_status varchar(16)
+    status_type varchar(16)
 );
 
 INSERT INTO user_status_types VALUES ('idle', 'hosting', 'playing');

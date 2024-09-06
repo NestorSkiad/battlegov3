@@ -209,23 +209,30 @@ func (e *Env) joinLobby(c *gin.Context) {
 		return
 	}
 
-	if lobby.Cardinality() == 0 {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found"})
+	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_status = $1", "hosting")
+	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
-
+	if matches < 0 {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found, consider hosting"})
+		return
+	}
 
 	// TODO:
-	// get number of users in hosting status
-	// if none, return... resource unavailable?
+	// --get number of users in hosting status
+	// --if none, return... resource unavailable?
 	// if some, get one random host, change status of both users to playing, put them in match
 	// match should be in memory, use a thread safe map
 	// I guess get/match should return a redirect if on the wrong server, match table should store IP
 }
 
-func hostMatch(c *gin.Context) {
-	user, err := extendSession(c)
+func (e *Env) hostMatch(c *gin.Context) {
+	if err := e.extendSession(c); err != nil {
+		return
+	}
 
 	if err != nil {
 		return
@@ -241,9 +248,7 @@ func hostMatch(c *gin.Context) {
 }
 
 func (e *Env) unhostMatch(c *gin.Context) {
-	user, err := extendSession(c)
-
-	if err != nil {
+	if err := e.extendSession(c); err != nil {
 		return
 	}
 
