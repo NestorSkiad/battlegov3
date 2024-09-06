@@ -16,6 +16,7 @@ import (
 
 // to be changed to env var for "prod"
 const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
+const sqlTimeFormat   = "2006-01-02 15:04:05-07"
 var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
 var sqlError 		  = errors.New("SQL Error")
 var MissingTokenError = errors.New("no token supplied")
@@ -41,13 +42,31 @@ func newUser(username string) user {
 		LastAccess: time.Now()}
 }
 
+func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
+	var username string
+	var lastaccess string
+	err := e.db.QueryRow(context.Background(), "SELECT username, lastaccess FROM tokens WHERE token = $1", token.String()).Scan(&username, &lastaccess)
+
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return nil, err
+	}
+
+	lastAccessTime, err := time.Parse(sqlTimeFormat, lastaccess)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Time conversion should NOT have failed!!!"})
+		return nil, err
+	}
+
+	return &user{Name: username, Token: token, LastAccess: lastAccessTime}, nil
+} 
+
 type match struct {
 	ID    uuid.UUID
 	Host  *user
 	Guest *user
 }
 
-// TODO: don't return errors from routing functions. they are the baseline
 func (e *Env) RemoveUser(username string, c *gin.Context) {
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
@@ -113,10 +132,15 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 }
 
 func (e *Env) postUsers(c *gin.Context) {
-	username, exists := c.GetPostForm("username") // TODO: check username length
+	username, exists := c.GetPostForm("username")
 
 	if username == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no username supplied"})
+		return
+	}
+
+	if len(username) > 15 {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "username too long"})
 		return
 	}
 
@@ -147,6 +171,7 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
+	// FIXME: time conversion. look for more
 	_, err = tx.Exec(context.Background(), "INSERT INTO tokens (username, token, lastaccess) VALUES ($1, $2, $3)", newu.Name, newu.Token, newu.LastAccess)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -168,36 +193,36 @@ func (e *Env) postUsers(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token, "message": "user created"})
 }
 
-func (e *Env) extendSession(c *gin.Context) error {
+func (e *Env) extendSession(c *gin.Context) (uuid.UUID, error) {
 	token, exists := c.GetPostForm("token")
 
 	if token == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no token supplied"})
-		return MissingTokenError
+		return uuid.Nil, MissingTokenError
 	}
 
 	tokenUUID, err := uuid.Parse(token)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "token not UUID"})
-		return err
+		return uuid.Nil, err
 	}
 
 	expired, err := e.CheckExpiryAndDelete(tokenUUID, c)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	if expired {
 		c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
-		return ExpiredTokenError
+		return uuid.Nil, ExpiredTokenError
 	}
 
 	_, err = e.db.Exec(context.Background(), "UPDATE tokens SET lastaccess = NOW() WHERE token = $1", token)
-	return err
+	return tokenUUID, err
 }
 
 func (e *Env) extendSessionRequest(c *gin.Context) {
-	if err := e.extendSession(c); err != nil {
+	if _, err := e.extendSession(c); err != nil {
 		return
 	}
 
@@ -205,7 +230,7 @@ func (e *Env) extendSessionRequest(c *gin.Context) {
 }
 
 func (e *Env) joinLobby(c *gin.Context) {
-	if err := e.extendSession(c); err != nil {
+	if token, err := e.extendSession(c); err != nil {
 		return
 	}
 
@@ -216,10 +241,29 @@ func (e *Env) joinLobby(c *gin.Context) {
 		return
 	}
 
-	if matches < 0 {
+	if matches == 0 {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found, consider hosting"})
 		return
 	}
+
+	rows, _ = e.db.Query(context.Background(), `
+		SELECT
+			username
+		FROM
+			user_status AS us,
+			tokens AS t
+		WHERE us.user_status = $1
+			AND NOW() - lastaccess < INTERVAL '10 minutes'
+		ORDER BY RANDOM()
+		LIMIT 1
+		`, "hosting")
+	hostname, err := pgx.CollectOneRow(rows, pgx.RowTo[string])
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", )
 
 	// TODO:
 	// --get number of users in hosting status
@@ -230,7 +274,7 @@ func (e *Env) joinLobby(c *gin.Context) {
 }
 
 func (e *Env) hostMatch(c *gin.Context) {
-	if err := e.extendSession(c); err != nil {
+	if _, err := e.extendSession(c); err != nil {
 		return
 	}
 
@@ -248,7 +292,7 @@ func (e *Env) hostMatch(c *gin.Context) {
 }
 
 func (e *Env) unhostMatch(c *gin.Context) {
-	if err := e.extendSession(c); err != nil {
+	if _, err := e.extendSession(c); err != nil {
 		return
 	}
 
@@ -256,7 +300,7 @@ func (e *Env) unhostMatch(c *gin.Context) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
 	}
 
-	e.RemoveUser(user)
+	e.RemoveUser(user, c)
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
@@ -270,7 +314,7 @@ func main() {
 
 	router := gin.Default()
 	env := &Env{db: dbpool}
-	router.POST("/user/:username", env.postUsers) // FIXME: router functions can't return errors
+	router.POST("/user/:username", env.postUsers)
 	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
 	router.POST("/joinLobby/:token", env.joinLobby)
 	router.POST("/hostMatch/:token", env.hostMatch)
