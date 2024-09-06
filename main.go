@@ -153,7 +153,11 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
-	// TODO: initialize user status
+	_, err = tx.Exec(context.Background(), "INSERT INTO user_status (username, user_status) VALUES ($1, $2)", newu.Name, "idle")
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
 
 	err = tx.Commit(context.Background())
 	if err != nil {
@@ -209,6 +213,8 @@ func (e *Env) joinLobby(c *gin.Context) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no match hosts found"})
 		return
 	}
+
+
 
 	// TODO:
 	// get number of users in hosting status

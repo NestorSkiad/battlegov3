@@ -14,9 +14,16 @@ CREATE TABLE IF NOT EXISTS tokens (
 
 CREATE TABLE IF NOT EXISTS user_status (
     username REFERENCES users(username) PRIMARY KEY ON DELETE CASCADE,
-    user_status 
+    user_status REFERENCES user_status_types(user_status),
+    game_id REFERENCES games(game_id) DEFAULT NULL ON DELETE SET NULL,
     PRIMARY KEY(username)
 );
+
+CREATE TABLE IF NOT EXISTS user_status_types (
+    user_status varchar(16)
+);
+
+INSERT INTO user_status_types VALUES ('idle', 'hosting', 'playing');
 
 CREATE TABLE IF NOT EXISTS games (
     game_id uuid,
@@ -25,10 +32,5 @@ CREATE TABLE IF NOT EXISTS games (
     PRIMARY KEY(game_id)
 );
 
-CREATE TABLE IF NOT EXISTS user_status_types (
-    user_status varchar(16),
-    game_id REFERENCES games(game_id) ON DELETE SET NULL
-);
-
-INSERT INTO user_status_types VALUES ('idle', 'hosting', 'playing');
+-- todo: game location table
 
