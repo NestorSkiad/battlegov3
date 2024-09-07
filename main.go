@@ -256,9 +256,43 @@ func (e *Env) hostMatch(c *gin.Context) {
 	}
 
 	// can only host if idle
+	tx, err := e.db.Begin(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
 
+	defer tx.Rollback(context.Background())
 
-	lobby.Add(user)
+	rows, err := tx.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_token = $1 AND user_status = $2", token.String(), "idle")
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	if matches == 0 {
+		c.IndentedJSON(http.StatusConflict, gin.H{"message": "user not idle"})
+		return
+	}
+
+	_, err = tx.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE user_token = $2", "hosting", token.String())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user now looking for other players"})
 }
 
@@ -267,6 +301,7 @@ func (e *Env) unhostMatch(c *gin.Context) {
 		return
 	}
 
+	// only if hosting. get status between playing and idle and return appropriate messages
 	if !lobby.Contains(user) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
 	}
