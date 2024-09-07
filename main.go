@@ -18,10 +18,10 @@ import (
 const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
 // const sqlTimeFormat   = "2006-01-02 15:04:05-07"
 var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
-var sqlError 		  = errors.New("SQL Error")
-var MissingTokenError = errors.New("no token supplied")
-var ExpiredTokenError = errors.New("token expired")
-var InvalidTokenError = errors.New("token invalid")
+var ErrSQL 		  = errors.New("SQL Error")
+var ErrMissingToken = errors.New("no token supplied")
+var ErrExpiredToken = errors.New("token expired")
+var ErrInvalidToken = errors.New("token invalid")
 
 // https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
 
@@ -152,12 +152,13 @@ func (e *Env) postUsers(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token.String(), "message": "user created"})
 }
 
+// TODO: rename to ValidateToken
 func (e *Env) extendSession(c *gin.Context) (uuid.UUID, error) {
 	token, exists := c.GetPostForm("token")
 
 	if token == "" || !exists {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no token supplied"})
-		return uuid.Nil, MissingTokenError
+		return uuid.Nil, ErrMissingToken
 	}
 
 	tokenUUID, err := uuid.Parse(token)
@@ -173,7 +174,7 @@ func (e *Env) extendSession(c *gin.Context) (uuid.UUID, error) {
 
 	if expired {
 		c.IndentedJSON(http.StatusUnauthorized, gin.H{"message": "token expired"})
-		return uuid.Nil, ExpiredTokenError
+		return uuid.Nil, ErrExpiredToken
 	}
 
 	_, err = e.db.Exec(context.Background(), "UPDATE tokens SET lastaccess = NOW() WHERE token = $1", token)
@@ -255,7 +256,6 @@ func (e *Env) hostMatch(c *gin.Context) {
 		return
 	}
 
-	// can only host if idle
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -264,12 +264,7 @@ func (e *Env) hostMatch(c *gin.Context) {
 
 	defer tx.Rollback(context.Background())
 
-	rows, err := tx.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_token = $1 AND user_status = $2", token.String(), "idle")
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-		return
-	}
-
+	rows, _ := tx.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_token = $1 AND user_status = $2", token.String(), "idle")
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -297,16 +292,43 @@ func (e *Env) hostMatch(c *gin.Context) {
 }
 
 func (e *Env) unhostMatch(c *gin.Context) {
-	if _, err := e.extendSession(c); err != nil {
+	token, err := e.extendSession(c)
+	if err != nil {
 		return
 	}
 
-	// only if hosting. get status between playing and idle and return appropriate messages
-	if !lobby.Contains(user) {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user not trying to host match"})
+	tx, err := e.db.Begin(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
 	}
 
-	e.RemoveUser(user, c)
+	defer tx.Rollback(context.Background())
+
+	rows, _ := tx.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_token = $1 AND user_status IN ($2, $3)", token.String(), "idle", "playing")
+	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	if matches == 1 {
+		c.IndentedJSON(http.StatusConflict, gin.H{"message": "user not hosting"})
+		return
+	}
+
+	_, err = tx.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE user_token = $2", "idle", token.String())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
