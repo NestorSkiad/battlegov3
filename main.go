@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -16,7 +16,7 @@ import (
 
 // to be changed to env var for "prod"
 const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
-const sqlTimeFormat   = "2006-01-02 15:04:05-07"
+// const sqlTimeFormat   = "2006-01-02 15:04:05-07"
 var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
 var sqlError 		  = errors.New("SQL Error")
 var MissingTokenError = errors.New("no token supplied")
@@ -27,19 +27,22 @@ var InvalidTokenError = errors.New("token invalid")
 
 type Env struct {
 	db *pgxpool.Pool
+	matches *sync.Map
+}
+
+type match struct {
+	ID, HostToken, GuestToken uuid.UUID
 }
 
 type user struct {
 	Name       string    `json:"name"`
 	Token      uuid.UUID `json:"token"`
-	LastAccess time.Time `json:"lastAccess"`
 }
 
 func newUser(username string) user {
 	return user{
 		Name:       username,
-		Token:      uuid.New(),
-		LastAccess: time.Now()}
+		Token:      uuid.New()}
 }
 
 func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
@@ -52,20 +55,16 @@ func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
 		return nil, err
 	}
 
+	/*
 	lastAccessTime, err := time.Parse(sqlTimeFormat, lastaccess)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Time conversion should NOT have failed!!!"})
 		return nil, err
 	}
+	*/
 
-	return &user{Name: username, Token: token, LastAccess: lastAccessTime}, nil
+	return &user{Name: username, Token: token}, nil
 } 
-
-type match struct {
-	ID    uuid.UUID
-	Host  *user
-	Guest *user
-}
 
 func (e *Env) RemoveUser(username string, c *gin.Context) {
 	tx, err := e.db.Begin(context.Background())
@@ -171,8 +170,7 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
-	// FIXME: time conversion. look for more
-	_, err = tx.Exec(context.Background(), "INSERT INTO tokens (username, token, lastaccess) VALUES ($1, $2, $3)", newu.Name, newu.Token, newu.LastAccess)
+	_, err = tx.Exec(context.Background(), "INSERT INTO tokens (username, token, lastaccess) VALUES ($1, $2, NOW())", newu.Name, newu.Token)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -230,7 +228,7 @@ func (e *Env) extendSessionRequest(c *gin.Context) {
 }
 
 func (e *Env) joinLobby(c *gin.Context) {
-	token, err := e.extendSession(c)
+	guestToken, err := e.extendSession(c)
 	if err != nil {
 		return
 	}
@@ -247,33 +245,45 @@ func (e *Env) joinLobby(c *gin.Context) {
 		return
 	}
 
-	rows, _ = e.db.Query(context.Background(), `
+	var hostName string
+	var hostToken uuid.UUID
+	err = e.db.QueryRow(context.Background(), `
 		SELECT
-			t.username
+			t.username,
+			t.token
 		FROM
 			user_status AS us,
 			tokens AS t
 		WHERE us.user_status = $1
 			AND NOW() - t.lastaccess < INTERVAL '10 minutes'
+			AND us.username = t.username
 		ORDER BY RANDOM()
 		LIMIT 1
-		`, "hosting")
-	hostname, err := pgx.CollectOneRow(rows, pgx.RowTo[string])
+		`, "hosting").Scan(&hostName, &hostToken)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
-	guestname, err := e.getUser(token, c)
+	guestName, err := e.getUser(guestToken, c)
 	if err != nil {
 		return
 	}
 
-	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", guestname, hostname)
+	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", guestName, hostName)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
+
+	matchID := uuid.New()
+	e.matches.Store(matchID, match{ID: matchID, HostToken: hostToken, GuestToken: guestToken})
+
+	// add list to match
+	// one user gets allowed during even turns, the other during odds
+	// make a group to handle game requests
+	// match functions should run as match dot something
+
 	// TODO:
 	// --get number of users in hosting status
 	// --if none, return... resource unavailable?
@@ -321,8 +331,10 @@ func main() {
 	}
 	defer dbpool.Close()
 
+	matches := sync.Map{}
+
 	router := gin.Default()
-	env := &Env{db: dbpool}
+	env := &Env{db: dbpool, matches: &matches}
 	router.POST("/user/:username", env.postUsers)
 	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
 	router.POST("/joinLobby/:token", env.joinLobby)
