@@ -66,12 +66,13 @@ func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
 	return &user{Name: username, Token: token}, nil
 } 
 
-func (e *Env) RemoveUser(token uuid.UUID, c *gin.Context) {
+func (e *Env) RemoveUser(token uuid.UUID, c *gin.Context) error {
 	_, err := e.db.Exec(context.Background(), "DELETE FROM tokens WHERE token = $1", token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-		return
+		return err
 	}
+	return nil
 }
 
 func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
@@ -93,8 +94,7 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 		return false, err
 	}
 
-	e.RemoveUser(token, c)
-	return true, nil
+	return true, e.RemoveUser(token, c)
 }
 
 func (e *Env) postUsers(c *gin.Context) {
