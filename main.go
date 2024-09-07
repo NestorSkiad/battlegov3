@@ -245,11 +245,9 @@ func (e *Env) joinLobby(c *gin.Context) {
 		return
 	}
 
-	var hostName string
-	var hostToken uuid.UUID
+	var hostTokenString string
 	err = e.db.QueryRow(context.Background(), `
 		SELECT
-			t.username,
 			t.token
 		FROM
 			user_status AS us,
@@ -259,18 +257,15 @@ func (e *Env) joinLobby(c *gin.Context) {
 			AND us.username = t.username
 		ORDER BY RANDOM()
 		LIMIT 1
-		`, "hosting").Scan(&hostName, &hostToken)
+		`, "hosting").Scan(&hostTokenString)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
-	guestName, err := e.getUser(guestToken, c)
-	if err != nil {
-		return
-	}
+	hostToken, _ := uuid.Parse(hostTokenString)
 
-	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", guestName, hostName)
+	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", guestToken, hostToken)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -282,7 +277,8 @@ func (e *Env) joinLobby(c *gin.Context) {
 	// add list to match
 	// one user gets allowed during even turns, the other during odds
 	// make a group to handle game requests
-	// match functions should run as match dot something
+	// match functions should run as match dot something dot functions
+	// squash the errors first though
 
 	// TODO:
 	// --get number of users in hosting status
@@ -293,18 +289,13 @@ func (e *Env) joinLobby(c *gin.Context) {
 }
 
 func (e *Env) hostMatch(c *gin.Context) {
-	if _, err := e.extendSession(c); err != nil {
-		return
-	}
-
+	token, err := e.extendSession(c)
 	if err != nil {
 		return
 	}
 
-	if lobby.Contains(user) {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "user already trying to host match"})
-		return
-	}
+	// can only host if idle
+
 
 	lobby.Add(user)
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user now looking for other players"})
