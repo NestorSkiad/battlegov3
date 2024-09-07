@@ -66,34 +66,12 @@ func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
 	return &user{Name: username, Token: token}, nil
 } 
 
-func (e *Env) RemoveUser(username string, c *gin.Context) {
-	tx, err := e.db.Begin(context.Background())
+func (e *Env) RemoveUser(token uuid.UUID, c *gin.Context) {
+	_, err := e.db.Exec(context.Background(), "DELETE FROM tokens WHERE token = $1", token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
-
-	defer tx.Rollback(context.Background())
-
-	_, err = tx.Exec(context.Background(), "DELETE FROM tokens WHERE username = $1", username)
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-		return
-	}
-
-	_, err = tx.Exec(context.Background(), "DELETE FROM users WHERE username = $1", username)
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-		return
-	}
-
-	err = tx.Commit(context.Background())
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-		return
-	}
-
-	return
 }
 
 func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
@@ -109,24 +87,13 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 		return true, nil
 	}
 
-	rows, err = e.db.Query(context.Background(), "DELETE FROM tokens WHERE token = $1 AND NOW() - lastaccess > INTERVAL '10 minutes' RETURNING username", token.String())
+	_, err = e.db.Exec(context.Background(), "DELETE FROM tokens WHERE token = $1 AND NOW() - lastaccess > INTERVAL '10 minutes'", token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return false, err
 	}
 
-	username, err := pgx.CollectOneRow(rows, pgx.RowTo[string])
-	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return false, nil
-		default:
-			c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-			return false, err
-		}
-	}
-
-	e.RemoveUser(username, c)
+	e.RemoveUser(token, c)
 	return true, nil
 }
 
@@ -143,7 +110,7 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
-	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM users WHERE username = $1", username)
+	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM tokens WHERE username = $1", username)
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -164,19 +131,13 @@ func (e *Env) postUsers(c *gin.Context) {
 	defer tx.Rollback(context.Background())
 
 	newu := newUser(username)
-	_, err = tx.Exec(context.Background(), "INSERT INTO users (username) VALUES ($1)", newu.Name)
+	_, err = tx.Exec(context.Background(), "INSERT INTO tokens (username, token, lastaccess) VALUES ($1, $2, NOW())", newu.Name, newu.Token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
 
-	_, err = tx.Exec(context.Background(), "INSERT INTO tokens (username, token, lastaccess) VALUES ($1, $2, NOW())", newu.Name, newu.Token)
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
-		return
-	}
-
-	_, err = tx.Exec(context.Background(), "INSERT INTO user_status (username, user_status) VALUES ($1, $2)", newu.Name, "idle")
+	_, err = tx.Exec(context.Background(), "INSERT INTO user_status (user_token, user_status) VALUES ($1, $2)", newu.Token.String(), "idle")
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -188,7 +149,7 @@ func (e *Env) postUsers(c *gin.Context) {
 		return
 	}
 
-	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token, "message": "user created"})
+	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token.String(), "message": "user created"})
 }
 
 func (e *Env) extendSession(c *gin.Context) (uuid.UUID, error) {
@@ -265,7 +226,7 @@ func (e *Env) joinLobby(c *gin.Context) {
 
 	hostToken, _ := uuid.Parse(hostTokenString)
 
-	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE username in ($2, $3)", "playing", guestToken, hostToken)
+	_, err = e.db.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE user_token in ($2, $3)", "playing", guestToken, hostToken)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
