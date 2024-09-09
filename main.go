@@ -18,6 +18,7 @@ import (
 const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
 const webServerHost   = "localhost"
 const webServerPort   = "8080"
+const webServerSecret = "randomenvvar774"
 
 // const sqlTimeFormat   = "2006-01-02 15:04:05-07"
 var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
@@ -192,7 +193,7 @@ func (e *Env) extendSessionRequest(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "session extended"})
 }
 
-func (e *Env) joinLobby(c *gin.Context) {
+func (e *Env) joinMatch(c *gin.Context) {
 	guestToken, err := e.extendSession(c)
 	if err != nil {
 		return
@@ -341,6 +342,31 @@ func (e *Env) unhostMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
+func (e *Env) loadGame(c *gin.Context) {
+	// get match id, secret from context
+	// IPs are not to be relied upon - proxies obfuscate
+	secret, existsOne := c.GetPostForm("secret")
+	gameID, existsTwo := c.GetPostForm("game_id")
+
+	if secret == "" || gameID == "" || !existsOne || !existsTwo { // maybe split
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "No secret or match ID supplied. Malformed internal request?!"})
+		return
+	}
+
+	if secret != webServerSecret {
+		c.IndentedJSON(http.StatusForbidden, gin.H{"message": "GET OUT"})
+		return
+	}
+
+	if _, exists := e.matches.Load(gameID); exists {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": "match already in memory"})
+		return
+	}
+
+	// load match from DB, store in mem, return OK
+	
+}
+
 func (e *Env) InitHost() {
 	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerHost)
 }
@@ -361,9 +387,14 @@ func main() {
 
 	router.POST("/user/:username", env.postUsers)
 	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
-	router.POST("/joinLobby/:token", env.joinLobby)
+	router.POST("/joinMatch/:token", env.joinMatch)
 	router.POST("/hostMatch/:token", env.hostMatch)
 	router.DELETE("/hostmatch/:token",env.unhostMatch)
+
+	internalGroup := router.Group("/internal")
+	{
+		internalGroup.POST("/loadGame", env.loadGame)
+	}
 
 	router.Run(webServerHost + ":" + webServerPort)
 }
