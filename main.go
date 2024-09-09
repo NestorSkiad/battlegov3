@@ -211,9 +211,11 @@ func (e *Env) joinLobby(c *gin.Context) {
 	}
 
 	var hostTokenString string
+	var hostAddrString string
 	err = e.db.QueryRow(context.Background(), `
 		SELECT
-			t.token
+			t.token,
+			host(us.host_addr)
 		FROM
 			user_status AS us,
 			tokens AS t
@@ -222,7 +224,7 @@ func (e *Env) joinLobby(c *gin.Context) {
 			AND us.username = t.username
 		ORDER BY RANDOM()
 		LIMIT 1
-		`, "hosting").Scan(&hostTokenString)
+		`, "hosting").Scan(&hostTokenString, &hostAddrString)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -235,6 +237,10 @@ func (e *Env) joinLobby(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
 	}
+
+	// how the fudge do I store the match in the other host's memory in case of redirect lmao
+	// send post request
+	// on receive post request, grab data from DB, put data in BEFORE redirect logic
 
 	matchID := uuid.New()
 	e.matches.Store(matchID, match{ID: matchID, HostToken: hostToken, GuestToken: guestToken})
@@ -250,7 +256,7 @@ func (e *Env) joinLobby(c *gin.Context) {
 	// --if none, return... resource unavailable?
 	// if some, get one random host, change status of both users to playing, put them in match
 	// match should be in memory, use a thread safe map
-	// I guess get/match should return a redirect if on the wrong server, match table should store IP
+	// get/match should return a redirect if on the wrong server, match table should store IP
 }
 
 func (e *Env) hostMatch(c *gin.Context) {
@@ -279,7 +285,7 @@ func (e *Env) hostMatch(c *gin.Context) {
 		return
 	}
 
-	_, err = tx.Exec(context.Background(), "UPDATE user_status SET user_status = $1 WHERE user_token = $2", "hosting", token.String())
+	_, err = tx.Exec(context.Background(), "UPDATE user_status SET user_status = $1, host = $2 WHERE user_token = $3", "hosting", webServerHost, token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -316,7 +322,7 @@ func (e *Env) unhostMatch(c *gin.Context) {
 	}
 
 	if matches == 1 {
-		c.IndentedJSON(http.StatusConflict, gin.H{"message": "user not hosting"})
+		c.IndentedJSON(http.StatusConflict, gin.H{"message": "user was not hosting"})
 		return
 	}
 

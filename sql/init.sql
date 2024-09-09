@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS user_status (
     user_token REFERENCES tokens(token) ON DELETE CASCADE,
     user_status REFERENCES user_status_types(status_type),
     game_id REFERENCES games(game_id) DEFAULT NULL ON DELETE SET NULL,
+    host_addr REFERENCES hosts(host_addr) DEFAULT NULL ON DELETE SET NULL,
     PRIMARY KEY(user_token)
 );
 
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS games (
     game_id uuid,
     player_one REFERENCES tokens(token) NOT NULL ON DELETE CASCADE,
     player_two REFERENCES tokens(token) NOT NULL ON DELETE CASCADE,
-    host REFERENCES hosts(host_addr),
+    host_addr REFERENCES hosts(host_addr),
     PRIMARY KEY(game_id)
 );
 
