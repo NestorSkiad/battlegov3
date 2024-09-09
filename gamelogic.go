@@ -5,6 +5,8 @@ import (
 	"math/rand"
 )
 
+// TODO: implement GameState struct, store in Match struct
+
 // possible use: secondary index for Boat pointers (won't have to linear check for boats given coords)
 type Matrix[T any] struct {
 	w, h int

@@ -35,7 +35,7 @@ type Env struct {
 }
 
 type match struct {
-	ID, HostToken, GuestToken uuid.UUID
+	HostToken, GuestToken uuid.UUID
 }
 
 type user struct {
@@ -211,8 +211,7 @@ func (e *Env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	var hostTokenString string
-	var hostAddrString string
+	var hostTokenString, hostAddrString string
 	err = e.db.QueryRow(context.Background(), `
 		SELECT
 			t.token,
@@ -343,13 +342,13 @@ func (e *Env) unhostMatch(c *gin.Context) {
 }
 
 func (e *Env) loadGame(c *gin.Context) {
-	// get match id, secret from context
+	// get game id, secret from context
 	// IPs are not to be relied upon - proxies obfuscate
 	secret, existsOne := c.GetPostForm("secret")
 	gameID, existsTwo := c.GetPostForm("game_id")
 
 	if secret == "" || gameID == "" || !existsOne || !existsTwo { // maybe split
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "No secret or match ID supplied. Malformed internal request?!"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "No secret or game ID supplied. Malformed internal request?!"})
 		return
 	}
 
@@ -363,8 +362,26 @@ func (e *Env) loadGame(c *gin.Context) {
 		return
 	}
 
-	// load match from DB, store in mem, return OK
-	
+	var hostTokenString, guestTokenString string
+	err := e.db.QueryRow(context.Background(), `
+		SELECT
+			player_one,
+			player_two
+		FROM
+			games
+		WHERE
+			game_id = $1
+	`).Scan(&hostTokenString, guestTokenString)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
+
+	hostToken, _ := uuid.Parse(hostTokenString)
+	guestToken, _ := uuid.Parse(guestTokenString)
+
+	e.matches.Store(gameID, match{HostToken: hostToken, GuestToken: guestToken})
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "match successfully stored in memory"})
 }
 
 func (e *Env) InitHost() {
