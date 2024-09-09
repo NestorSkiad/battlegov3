@@ -26,9 +26,11 @@ CREATE TABLE IF NOT EXISTS games (
     game_id uuid,
     player_one REFERENCES tokens(token) NOT NULL ON DELETE CASCADE,
     player_two REFERENCES tokens(token) NOT NULL ON DELETE CASCADE,
-    host inet
+    host REFERENCES hosts(host_addr),
     PRIMARY KEY(game_id)
 );
 
--- todo: game location table
+CREATE TABLE IF NOT EXISTS hosts (
+    host_addr inet PRIMARY KEY
+);
 

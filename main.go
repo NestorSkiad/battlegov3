@@ -16,12 +16,15 @@ import (
 
 // to be changed to env var for "prod"
 const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
+const webServerHost   = "localhost"
+const webServerPort   = "8080"
+
 // const sqlTimeFormat   = "2006-01-02 15:04:05-07"
 var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
-var ErrSQL 		  = errors.New("SQL Error")
-var ErrMissingToken = errors.New("no token supplied")
-var ErrExpiredToken = errors.New("token expired")
-var ErrInvalidToken = errors.New("token invalid")
+var ErrSQL 		      = errors.New("SQL Error")
+var ErrMissingToken   = errors.New("no token supplied")
+var ErrExpiredToken   = errors.New("token expired")
+var ErrInvalidToken   = errors.New("token invalid")
 
 // https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
 
@@ -332,6 +335,10 @@ func (e *Env) unhostMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
+func (e *Env) InitHost() {
+	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerHost)
+}
+
 func main() {
 	dbpool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
@@ -341,14 +348,16 @@ func main() {
 	defer dbpool.Close()
 
 	matches := sync.Map{}
+	env := &Env{db: dbpool, matches: &matches}
+	go env.InitHost()
 
 	router := gin.Default()
-	env := &Env{db: dbpool, matches: &matches}
+
 	router.POST("/user/:username", env.postUsers)
 	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
 	router.POST("/joinLobby/:token", env.joinLobby)
 	router.POST("/hostMatch/:token", env.hostMatch)
 	router.DELETE("/hostmatch/:token",env.unhostMatch)
 
-	router.Run("localhost:8080")
+	router.Run(webServerHost + ":" + webServerPort)
 }
