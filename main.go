@@ -243,7 +243,7 @@ func (e *Env) joinMatch(c *gin.Context) {
 	// on receive post request, grab data from DB, put data in BEFORE redirect logic
 
 	matchID := uuid.New()
-	e.matches.Store(matchID, match{ID: matchID, HostToken: hostToken, GuestToken: guestToken})
+	e.matches.Store(matchID, match{HostToken: hostToken, GuestToken: guestToken})
 
 	// add list to match
 	// one user gets allowed during even turns, the other during odds
@@ -341,6 +341,7 @@ func (e *Env) unhostMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
+// FIXME: naming inconsitencies between games/matches
 func (e *Env) loadGame(c *gin.Context) {
 	// get game id, secret from context
 	// IPs are not to be relied upon - proxies obfuscate
