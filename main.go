@@ -211,11 +211,12 @@ func (e *Env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	var hostTokenString, hostAddrString string
+	var hostTokenString, hostAddrString, hostPortString string
 	err = e.db.QueryRow(context.Background(), `
 		SELECT
 			t.token,
-			host(us.host_addr)
+			host(us.host_addr),
+			(SELECT port FROM hosts AS h WHERE h.host_addr = us.host_addr)
 		FROM
 			user_status AS us,
 			tokens AS t
@@ -224,7 +225,7 @@ func (e *Env) joinMatch(c *gin.Context) {
 			AND us.username = t.username
 		ORDER BY RANDOM()
 		LIMIT 1
-		`, "hosting").Scan(&hostTokenString, &hostAddrString)
+		`, "hosting").Scan(&hostTokenString, &hostAddrString, &hostPortString)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -341,19 +342,12 @@ func (e *Env) unhostMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user no longer hosting"})
 }
 
-// FIXME: naming inconsitencies between games/matches
+// FIXME: naming inconsistencies between games/matches
 func (e *Env) loadGame(c *gin.Context) {
-	// IPs are not to be relied upon - proxies obfuscate
-	secret, existsOne := c.GetPostForm("secret")
-	gameID, existsTwo := c.GetPostForm("game_id")
+	gameID, exists := c.GetPostForm("game_id")
 
-	if secret == "" || gameID == "" || !existsOne || !existsTwo { // maybe split
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "No secret or game ID supplied. Malformed internal request?!"})
-		return
-	}
-
-	if secret != webServerSecret {
-		c.IndentedJSON(http.StatusForbidden, gin.H{"message": "GET OUT"})
+	if gameID == "" || !exists { // maybe split
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "No game ID supplied. Malformed internal request?!"})
 		return
 	}
 
@@ -400,7 +394,7 @@ func (e *Env) checkSecret(c *gin.Context) {
 }
 
 func (e *Env) InitHost() {
-	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerHost)
+	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr, port) VALUES ($1)", webServerHost, webServerPort)
 }
 
 func main() {

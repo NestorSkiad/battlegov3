@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS games (
 );
 
 CREATE TABLE IF NOT EXISTS hosts (
-    host_addr inet PRIMARY KEY
+    host_addr inet PRIMARY KEY,
+    port INT
 );
 
