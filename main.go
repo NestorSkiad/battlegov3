@@ -18,6 +18,7 @@ import (
 const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
 const webServerHost   = "localhost"
 const webServerPort   = "8080"
+const webServerAddr   = webServerHost + webServerPort
 const webServerSecret = "randomenvvar774"
 
 // const sqlTimeFormat   = "2006-01-02 15:04:05-07"
@@ -215,8 +216,7 @@ func (e *Env) joinMatch(c *gin.Context) {
 	err = e.db.QueryRow(context.Background(), `
 		SELECT
 			t.token,
-			host(us.host_addr),
-			(SELECT port FROM hosts AS h WHERE h.host_addr = us.host_addr)
+			us.host_addr
 		FROM
 			user_status AS us,
 			tokens AS t
@@ -394,7 +394,7 @@ func (e *Env) checkSecret(c *gin.Context) {
 }
 
 func (e *Env) InitHost() {
-	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr, port) VALUES ($1)", webServerHost, webServerPort)
+	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerAddr)
 }
 
 func main() {
@@ -407,7 +407,7 @@ func main() {
 
 	matches := sync.Map{}
 	env := &Env{db: dbpool, matches: &matches}
-	go env.InitHost()
+	go env.InitHost() // TODO: error handling for this
 
 	router := gin.Default()
 
