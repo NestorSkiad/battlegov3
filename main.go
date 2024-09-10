@@ -343,7 +343,6 @@ func (e *Env) unhostMatch(c *gin.Context) {
 
 // FIXME: naming inconsitencies between games/matches
 func (e *Env) loadGame(c *gin.Context) {
-	// get game id, secret from context
 	// IPs are not to be relied upon - proxies obfuscate
 	secret, existsOne := c.GetPostForm("secret")
 	gameID, existsTwo := c.GetPostForm("game_id")
@@ -385,6 +384,21 @@ func (e *Env) loadGame(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "match successfully stored in memory"})
 }
 
+func (e *Env) checkSecret(c *gin.Context) {
+	secret, exists := c.GetPostForm("secret")
+
+	if secret == "" || !exists {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "No secret supplied. Malformed internal request?!"})
+		c.Abort()
+		return
+	}
+
+	if secret != webServerSecret {
+		c.IndentedJSON(http.StatusForbidden, gin.H{"message": "GET OUT"})
+		c.Abort()
+	}
+}
+
 func (e *Env) InitHost() {
 	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerHost)
 }
@@ -409,7 +423,7 @@ func main() {
 	router.POST("/hostMatch/:token", env.hostMatch)
 	router.DELETE("/hostmatch/:token",env.unhostMatch)
 
-	internalGroup := router.Group("/internal")
+	internalGroup := router.Group("/internal", env.checkSecret)
 	{
 		internalGroup.POST("/loadGame", env.loadGame)
 	}
