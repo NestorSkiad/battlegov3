@@ -15,22 +15,22 @@ import (
 )
 
 // to be changed to env var for "prod"
-const dbURL           = "postgres://postgres:admin@localhost:5432/postgres"
-const webServerHost   = "localhost"
-const webServerPort   = "8080"
-const webServerAddr   = webServerHost + webServerPort
+const dbURL = "postgres://postgres:admin@localhost:5432/postgres"
+const webServerHost = "localhost"
+const webServerPort = "8080"
+const webServerAddr = webServerHost + webServerPort
 const webServerSecret = "randomenvvar774"
 
 // const sqlTimeFormat   = "2006-01-02 15:04:05-07"
-var sqlErrorMessage   = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
-var ErrSQL 		      = errors.New("SQL Error")
-var ErrMissingToken   = errors.New("no token supplied")
-var ErrExpiredToken   = errors.New("token expired")
-var ErrInvalidToken   = errors.New("token invalid")
+var sqlErrorMessage = gin.H{"message": "Unknown SQL error. Contact Admins. Or don't."}
+var ErrSQL = errors.New("SQL Error")
+var ErrMissingToken = errors.New("no token supplied")
+var ErrExpiredToken = errors.New("token expired")
+var ErrInvalidToken = errors.New("token invalid")
 
 // https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
 
-type Env struct {
+type env struct {
 	db *pgxpool.Pool
 	matches *sync.Map
 }
@@ -40,17 +40,17 @@ type match struct {
 }
 
 type user struct {
-	Name       string    `json:"name"`
-	Token      uuid.UUID `json:"token"`
+	Name  string    `json:"name"`
+	Token uuid.UUID `json:"token"`
 }
 
 func newUser(username string) user {
 	return user{
-		Name:       username,
-		Token:      uuid.New()}
+		Name:  username,
+		Token: uuid.New()}
 }
 
-func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
+func (e *env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
 	var username string
 	var lastaccess string
 	err := e.db.QueryRow(context.Background(), "SELECT username, lastaccess FROM tokens WHERE token = $1", token.String()).Scan(&username, &lastaccess)
@@ -61,17 +61,17 @@ func (e *Env) getUser(token uuid.UUID, c *gin.Context) (*user, error) {
 	}
 
 	/*
-	lastAccessTime, err := time.Parse(sqlTimeFormat, lastaccess)
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Time conversion should NOT have failed!!!"})
-		return nil, err
-	}
+		lastAccessTime, err := time.Parse(sqlTimeFormat, lastaccess)
+		if err != nil {
+			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "Time conversion should NOT have failed!!!"})
+			return nil, err
+		}
 	*/
 
 	return &user{Name: username, Token: token}, nil
-} 
+}
 
-func (e *Env) RemoveUser(token uuid.UUID, c *gin.Context) error {
+func (e *env) RemoveUser(token uuid.UUID, c *gin.Context) error {
 	_, err := e.db.Exec(context.Background(), "DELETE FROM tokens WHERE token = $1", token.String())
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -80,7 +80,7 @@ func (e *Env) RemoveUser(token uuid.UUID, c *gin.Context) error {
 	return nil
 }
 
-func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
+func (e *env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error) {
 	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM tokens WHERE token = $1", token.String())
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
@@ -102,7 +102,7 @@ func (e *Env) CheckExpiryAndDelete(token uuid.UUID, c *gin.Context) (bool, error
 	return true, e.RemoveUser(token, c)
 }
 
-func (e *Env) postUsers(c *gin.Context) {
+func (e *env) postUsers(c *gin.Context) {
 	username, exists := c.GetPostForm("username")
 
 	if username == "" || !exists {
@@ -158,7 +158,7 @@ func (e *Env) postUsers(c *gin.Context) {
 }
 
 // TODO: rename to ValidateToken
-func (e *Env) extendSession(c *gin.Context) (uuid.UUID, error) {
+func (e *env) extendSession(c *gin.Context) (uuid.UUID, error) {
 	token, exists := c.GetPostForm("token")
 
 	if token == "" || !exists {
@@ -186,7 +186,7 @@ func (e *Env) extendSession(c *gin.Context) (uuid.UUID, error) {
 	return tokenUUID, err
 }
 
-func (e *Env) extendSessionRequest(c *gin.Context) {
+func (e *env) extendSessionRequest(c *gin.Context) {
 	if _, err := e.extendSession(c); err != nil {
 		return
 	}
@@ -194,7 +194,7 @@ func (e *Env) extendSessionRequest(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "session extended"})
 }
 
-func (e *Env) joinMatch(c *gin.Context) {
+func (e *env) joinMatch(c *gin.Context) {
 	guestToken, err := e.extendSession(c)
 	if err != nil {
 		return
@@ -270,7 +270,7 @@ func (e *Env) joinMatch(c *gin.Context) {
 	// squash the errors first though
 }
 
-func (e *Env) hostMatch(c *gin.Context) {
+func (e *env) hostMatch(c *gin.Context) {
 	token, err := e.extendSession(c)
 	if err != nil {
 		return
@@ -311,7 +311,7 @@ func (e *Env) hostMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "user now looking for other players"})
 }
 
-func (e *Env) unhostMatch(c *gin.Context) {
+func (e *env) unhostMatch(c *gin.Context) {
 	token, err := e.extendSession(c)
 	if err != nil {
 		return
@@ -353,7 +353,7 @@ func (e *Env) unhostMatch(c *gin.Context) {
 }
 
 // FIXME: naming inconsistencies between games/matches
-func (e *Env) loadGame(c *gin.Context) {
+func (e *env) loadGame(c *gin.Context) {
 	gameID, exists := c.GetPostForm("game_id")
 
 	if gameID == "" || !exists { // maybe split
@@ -388,7 +388,7 @@ func (e *Env) loadGame(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "match successfully stored in memory"})
 }
 
-func (e *Env) checkSecret(c *gin.Context) {
+func (e *env) checkSecret(c *gin.Context) {
 	secret, exists := c.GetPostForm("secret")
 
 	if secret == "" || !exists {
@@ -403,7 +403,7 @@ func (e *Env) checkSecret(c *gin.Context) {
 	}
 }
 
-func (e *Env) InitHost() {
+func (e *env) InitHost() {
 	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerAddr)
 }
 
@@ -416,7 +416,7 @@ func main() {
 	defer dbpool.Close()
 
 	matches := sync.Map{}
-	env := &Env{db: dbpool, matches: &matches}
+	env := &env{db: dbpool, matches: &matches}
 	go env.InitHost() // TODO: error handling for this
 
 	router := gin.Default()
@@ -425,11 +425,16 @@ func main() {
 	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
 	router.POST("/joinMatch/:token", env.joinMatch)
 	router.POST("/hostMatch/:token", env.hostMatch)
-	router.DELETE("/hostmatch/:token",env.unhostMatch)
+	router.DELETE("/hostmatch/:token", env.unhostMatch)
 
 	internalGroup := router.Group("/internal", env.checkSecret)
 	{
 		internalGroup.POST("/loadGame", env.loadGame)
+	}
+
+	gameGroup := router.Group("/internal", env.checkSecret)
+	{
+		gameGroup.GET("/game", env.getGame)
 	}
 
 	router.Run(webServerHost + ":" + webServerPort)

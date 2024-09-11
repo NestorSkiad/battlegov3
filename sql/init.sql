@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS games (
     PRIMARY KEY(game_id)
 );
 
+-- if I do busy logic, add status field here
+-- busy logic =: thread checks server status every few minutes, sets status based on metrics
+-- when user tries to host, if server is busy, redirect to random non-busy server
 CREATE TABLE IF NOT EXISTS hosts (
-    host_addr varchar(45) PRIMARY KEY,
+    host_addr varchar(45) PRIMARY KEY
 );
 
