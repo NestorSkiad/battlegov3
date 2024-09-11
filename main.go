@@ -239,9 +239,19 @@ func (e *Env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	// how the fudge do I store the match in the other host's memory in case of redirect lmao
-	// send post request
-	// on receive post request, grab data from DB, put data in BEFORE redirect logic
+	// store match in DB here
+
+	if hostAddrString != webServerHost {
+		resp, err := http.Get("http://" + hostAddrString)
+		if err != nil || resp.StatusCode != http.StatusOK { // might not work as expected
+			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "internal communication error"})
+			return
+		}
+		resp.Body.Close()
+
+		c.IndentedJSON(http.StatusFound, gin.H{"message": "redirect requests to game server", "location": "http://" + hostAddrString})
+		return
+	}
 
 	matchID := uuid.New()
 	e.matches.Store(matchID, match{HostToken: hostToken, GuestToken: guestToken})
