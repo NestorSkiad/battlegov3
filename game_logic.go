@@ -26,13 +26,13 @@ func (m Matrix[T]) Set(x, y int, t T) {
 }
 
 // type system shenanigans
-type Direction bool
+type Direction int
 
 const (
-	North Direction = true
-	South Direction = true
-	East  Direction = true
-	West  Direction = true
+	North Direction = iota
+	East
+	South
+	West
 )
 
 var directions = []Direction{North, South, East, West}
