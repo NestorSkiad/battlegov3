@@ -239,35 +239,35 @@ func (e *Env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	// store match in DB here
+	_, err = e.db.Exec(context.Background(), "INSERT INTO games (uuid, player_one, player_two, host_addr) VALUES ($1, $2, $3, $4)", uuid.New().String(), hostToken.String(), guestToken.String(), hostAddrString)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
+	}
 
 	if hostAddrString != webServerHost {
 		resp, err := http.Get("http://" + hostAddrString)
-		if err != nil || resp.StatusCode != http.StatusOK { // might not work as expected
+		if err != nil || resp.StatusCode != http.StatusOK {
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "internal communication error"})
 			return
 		}
 		resp.Body.Close()
 
-		c.IndentedJSON(http.StatusFound, gin.H{"message": "redirect requests to game server", "location": "http://" + hostAddrString})
+		c.IndentedJSON(http.StatusFound, gin.H{"message": "redirect requests to host server", "location": "http://" + hostAddrString})
 		return
 	}
 
 	matchID := uuid.New()
 	e.matches.Store(matchID, match{HostToken: hostToken, GuestToken: guestToken})
 
+	// respond with OK, message to enter game logic, include match ID
+
+	// TODO: rest of game logic
 	// add list to match
 	// one user gets allowed during even turns, the other during odds
 	// make a group to handle game requests
 	// match functions should run as match dot something dot functions
 	// squash the errors first though
-
-	// TODO:
-	// --get number of users in hosting status
-	// --if none, return... resource unavailable?
-	// if some, get one random host, change status of both users to playing, put them in match
-	// match should be in memory, use a thread safe map
-	// get/match should return a redirect if on the wrong server, match table should store IP
 }
 
 func (e *Env) hostMatch(c *gin.Context) {
