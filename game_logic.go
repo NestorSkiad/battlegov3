@@ -23,9 +23,10 @@ func (m Matrix[T]) Set(x, y int, t T) {
 	m.data[y*m.w+x] = t
 }
 
-// type system shenanigans
+// Direction means compass directions
 type Direction int
 
+// Compass directions
 const (
 	North Direction = iota
 	East
@@ -33,14 +34,18 @@ const (
 	West
 )
 
-type Player int
+var directions = []Direction{North, South, East, West}
 
+// PlayerType demarkates either host or guest
+type PlayerType int
+
+// PlayerType values
 const (
-	Host Player = iota
+	Host PlayerType = iota
 	Guest
 )
 
-var directions = []Direction{North, South, East, West}
+var players = []PlayerType{Host, Guest}
 
 type Ship struct {
 	startx, starty, endx, endy int
@@ -62,8 +67,36 @@ type Move struct {
 type GameState struct {
 	boardHost *Board
 	boardGuest *Board
-	evens Player
+	evens PlayerType
 	moves []*Move
+}
+
+// implement presentablegamestate struct, as in https://github.com/gin-gonic/gin/issues/715#issuecomment-381302094
+// implement GS.toPresentable which takes Player and returns Presentable object with only that player's board
+// add json bindings to ship, board, move
+
+func newGameState() (*GameState, error) {
+	gs := &GameState{}
+
+	dim := rand.Intn(5) + 8
+
+	boardHost, err := newBoardFromRandom(dim)
+	if err != nil {
+		return nil, err
+	}
+	gs.boardHost = boardHost
+
+	boardGuest, err := newBoardFromRandom(dim)
+	if err != nil {
+		return nil, err
+	}
+	gs.boardGuest = boardGuest
+
+	gs.evens = players[rand.Intn(len(players))]
+
+	gs.moves = []*Move{}
+	
+	return gs, nil
 }
 
 func (m *GameState) makeMove() error {
