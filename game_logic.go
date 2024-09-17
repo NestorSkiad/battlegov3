@@ -33,11 +33,19 @@ const (
 	West
 )
 
+type Player int
+
+const (
+	Host Player = iota
+	Guest
+)
+
 var directions = []Direction{North, South, East, West}
 
 type Ship struct {
 	startx, starty, endx, endy int
 	dir                        Direction
+	alive					   bool
 }
 
 type Board struct {
@@ -47,10 +55,14 @@ type Board struct {
 
 type Move struct {
 	x, y int
+	hit bool
 }
 
+// TODO: newGameState func
 type GameState struct {
-	board *Board
+	boardHost *Board
+	boardGuest *Board
+	evens Player
 	moves []*Move
 }
 
@@ -92,7 +104,7 @@ func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (in
 }
 
 func newShip(startx, starty, endx, endy int, direction Direction) *Ship {
-	return &Ship{startx, starty, endx, endy, direction}
+	return &Ship{startx, starty, endx, endy, direction, true}
 }
 
 func newBoard(w, h int, ships ...*Ship) (*Board, error) {
