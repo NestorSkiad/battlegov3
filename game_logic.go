@@ -129,7 +129,7 @@ func (board *Board) addShip(ship *Ship) error {
 	return nil
 }
 
-func shipAtCoords(board *Board, x, y int) bool {
+func (board *Board) shipAtCoords(x, y int) bool {
 	if (x >= board.w) || (y >= board.h) {
 		return false
 	}
@@ -142,8 +142,8 @@ func shipAtCoords(board *Board, x, y int) bool {
 	return false
 }
 
-func newBoardFromRandom() (*Board, error) {
-	dim := rand.Intn(5) + 8
+func newBoardFromRandom(dim int) (*Board, error) {
+	// dim := rand.Intn(5) + 8 not here, at init gamestate level, boards need same dim
 
 	board, _ := newBoard(dim, dim)
 
