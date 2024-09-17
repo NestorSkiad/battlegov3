@@ -2,6 +2,12 @@ package main
 
 import "github.com/gin-gonic/gin"
 
+type presentableGameState struct {
+	Board *Board `json:"board"`
+	Evens PlayerType `json:"firstPlayer"`
+	Moves []*Move `json:"moves"`
+} 
+
 func (e *env) getGame(_ *gin.Context) {
 
 	// get gameid, token

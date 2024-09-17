@@ -23,9 +23,10 @@ func (m Matrix[T]) Set(x, y int, t T) {
 	m.data[y*m.w+x] = t
 }
 
-// Direction means compass directions
+// Direction of where the ship points
 type Direction int
 
+// FIXME: this won't work. convert to horizontal/vertical
 // Compass directions
 const (
 	North Direction = iota
@@ -47,20 +48,26 @@ const (
 
 var players = []PlayerType{Host, Guest}
 
+// TODO: json tags
+// A ship in Battleship
 type Ship struct {
 	startx, starty, endx, endy int
 	dir                        Direction
 	alive					   bool
 }
 
+// Board abstraction, with dimensions and ships
 type Board struct {
-	w, h  int
-	ships []*Ship
+	W int `json:"width"`
+	H  int `json:"height"`
+	Ships []*Ship `json:"ships"`
 }
 
+// Move made by a player
 type Move struct {
-	x, y int
-	hit bool
+	X int `json:"x"`
+	Y int `json:"y"`
+	Hit bool `json:"hit"`
 }
 
 // GameState represents a game
@@ -154,20 +161,20 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 
 // func addShip
 func (board *Board) addShip(ship *Ship) error {
-	if ship.startx >= board.w || ship.endx >= board.w || ship.starty >= board.h || ship.endy >= board.h {
+	if ship.startx >= board.W || ship.endx >= board.W || ship.starty >= board.H || ship.endy >= board.H {
 		return errors.New("tried to add ship into out of bounds")
 	}
 
-	board.ships = append(board.ships, ship)
+	board.Ships = append(board.Ships, ship)
 	return nil
 }
 
 func (board *Board) shipAtCoords(x, y int) bool {
-	if (x >= board.w) || (y >= board.h) {
+	if (x >= board.W) || (y >= board.H) {
 		return false
 	}
 
-	for _, ship := range board.ships {
+	for _, ship := range board.Ships {
 		if (x >= ship.startx) && (x <= ship.endx) && (y >= ship.starty) && (y <= ship.endy) {
 			return true
 		}
@@ -187,7 +194,7 @@ func newBoardFromRandom(dim int) (*Board, error) {
 		direction := directions[rand.Intn(len(directions))]
 
 		// maybe randomise ship length
-		endx, endy, err := getEndCoords(startx, starty, board.w, board.h, 3, direction)
+		endx, endy, err := getEndCoords(startx, starty, board.W, board.H, 3, direction)
 		if err != nil {
 			i--
 			continue
