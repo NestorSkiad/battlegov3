@@ -63,7 +63,7 @@ type Move struct {
 	hit bool
 }
 
-// TODO: newGameState func
+// GameState represents a game
 type GameState struct {
 	boardHost *Board
 	boardGuest *Board
