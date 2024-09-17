@@ -37,6 +37,7 @@ type env struct {
 
 type match struct {
 	HostToken, GuestToken uuid.UUID
+	GameState GameState
 }
 
 type user struct {
@@ -403,7 +404,7 @@ func (e *env) checkSecret(c *gin.Context) {
 	}
 }
 
-func (e *env) InitHost() {
+func (e *env) initHost() {
 	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerAddr)
 }
 
@@ -417,7 +418,7 @@ func main() {
 
 	matches := sync.Map{}
 	env := &env{db: dbpool, matches: &matches}
-	go env.InitHost() // TODO: error handling for this
+	go env.initHost() // TODO: error handling for this
 
 	router := gin.Default()
 

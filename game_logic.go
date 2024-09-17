@@ -5,8 +5,6 @@ import (
 	"math/rand"
 )
 
-// TODO: implement GameState struct, store in Match struct
-
 // possible use: secondary index for Boat pointers (won't have to linear check for boats given coords)
 type Matrix[T any] struct {
 	w, h int
@@ -45,6 +43,19 @@ type Ship struct {
 type Board struct {
 	w, h  int
 	ships []*Ship
+}
+
+type Move struct {
+	x, y int
+}
+
+type GameState struct {
+	board *Board
+	moves []*Move
+}
+
+func (m *GameState) makeMove() error {
+	return nil
 }
 
 func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (int, int, error) {
@@ -97,7 +108,7 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 }
 
 // func addShip
-func addShip(board *Board, ship *Ship) error {
+func (board *Board) addShip(ship *Ship) error {
 	if ship.startx >= board.w || ship.endx >= board.w || ship.starty >= board.h || ship.endy >= board.h {
 		return errors.New("tried to add ship into out of bounds")
 	}
@@ -138,7 +149,7 @@ func newBoardFromRandom() (*Board, error) {
 		}
 
 		ship := newShip(startx, starty, endx, endy, direction)
-		addShip(board, ship)
+		board.addShip(ship)
 		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
 
