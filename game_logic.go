@@ -27,15 +27,13 @@ func (m Matrix[T]) Set(x, y int, t T) {
 type Direction int
 
 // FIXME: this won't work. convert to horizontal/vertical
-// Compass directions
+// Ship directionality values
 const (
-	North Direction = iota
-	East
-	South
-	West
+	Horizontal Direction = iota
+	Vertical
 )
 
-var directions = []Direction{North, South, East, West}
+var directions = []Direction{Horizontal, Vertical}
 
 // PlayerType demarkates either host or guest
 type PlayerType int
@@ -51,9 +49,12 @@ var players = []PlayerType{Host, Guest}
 // TODO: json tags
 // A ship in Battleship
 type Ship struct {
-	startx, starty, endx, endy int
-	dir                        Direction
-	alive					   bool
+	startx int
+	starty int
+	endx int
+	endy int
+	dir Direction
+	alive bool
 }
 
 // Board abstraction, with dimensions and ships
@@ -114,26 +115,14 @@ func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (in
 	outOfBoundsError := errors.New("ship is out of bounds")
 
 	switch dir {
-	case North:
+	case Vertical:
 		if endy := starty + length; endy >= boardy {
 			return 0, 0, outOfBoundsError
 		} else {
 			return startx, endy, nil
 		}
-	case South:
-		if endy := starty - length; endy < 0 {
-			return 0, 0, outOfBoundsError
-		} else {
-			return startx, endy, nil
-		}
-	case East:
+	case Horizontal:
 		if endx := startx + length; endx >= boardx {
-			return 0, 0, outOfBoundsError
-		} else {
-			return endx, starty, nil
-		}
-	case West:
-		if endx := startx - length; endx < 0 {
 			return 0, 0, outOfBoundsError
 		} else {
 			return endx, starty, nil
@@ -183,8 +172,6 @@ func (board *Board) shipAtCoords(x, y int) bool {
 }
 
 func newBoardFromRandom(dim int) (*Board, error) {
-	// dim := rand.Intn(5) + 8 not here, at init gamestate level, boards need same dim
-
 	board, _ := newBoard(dim, dim)
 
 	for i := 0; i < 3; i++ {
