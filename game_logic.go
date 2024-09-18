@@ -46,15 +46,14 @@ const (
 
 var players = []PlayerType{Host, Guest}
 
-// TODO: json tags
-// A ship in Battleship
+// Ship in Battleship
 type Ship struct {
-	startx int
-	starty int
-	endx int
-	endy int
-	dir Direction
-	alive bool
+	Startx int `json:"startx"`
+	Starty int	`json:"starty"`
+	Endx int `json:"endx"`
+	Endy int `json:"endy"`
+	Dir Direction `json:"direction"`
+	Alive bool `json:"alive"`
 }
 
 // Board abstraction, with dimensions and ships
@@ -140,7 +139,7 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 	outOfBoundsError := errors.New("ship is out of bounds")
 
 	for _, ship := range ships {
-		if (ship.startx >= w) || (ship.startx < 0) || (ship.starty >= h) || (ship.starty < 0) || (ship.endx >= w) || (ship.endx < 0) || (ship.endy >= h) || (ship.endy < 0) {
+		if (ship.Startx >= w) || (ship.Startx < 0) || (ship.Starty >= h) || (ship.Starty < 0) || (ship.Endx >= w) || (ship.Endx < 0) || (ship.Endy >= h) || (ship.Endy < 0) {
 			return nil, outOfBoundsError
 		}
 	}
@@ -150,7 +149,7 @@ func newBoard(w, h int, ships ...*Ship) (*Board, error) {
 
 // func addShip
 func (board *Board) addShip(ship *Ship) error {
-	if ship.startx >= board.W || ship.endx >= board.W || ship.starty >= board.H || ship.endy >= board.H {
+	if ship.Startx >= board.W || ship.Endx >= board.W || ship.Starty >= board.H || ship.Endy >= board.H {
 		return errors.New("tried to add ship into out of bounds")
 	}
 
@@ -164,7 +163,7 @@ func (board *Board) shipAtCoords(x, y int) bool {
 	}
 
 	for _, ship := range board.Ships {
-		if (x >= ship.startx) && (x <= ship.endx) && (y >= ship.starty) && (y <= ship.endy) {
+		if (x >= ship.Startx) && (x <= ship.Endx) && (y >= ship.Starty) && (y <= ship.Endy) {
 			return true
 		}
 	}
