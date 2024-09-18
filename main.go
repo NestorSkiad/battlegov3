@@ -31,13 +31,13 @@ var ErrInvalidToken = errors.New("token invalid")
 // https://github.com/gin-gonic/gin/issues/932#issuecomment-306242400
 
 type env struct {
-	db *pgxpool.Pool
+	db      *pgxpool.Pool
 	matches *sync.Map
 }
 
 type match struct {
 	HostToken, GuestToken uuid.UUID
-	GameState *GameState
+	GameState             *GameState
 }
 
 type user struct {
@@ -381,7 +381,7 @@ func (e *env) loadGame(c *gin.Context) {
 			games
 		WHERE
 			game_id = $1
-	`).Scan(&hostTokenString, guestTokenString)
+	`, gameID).Scan(&hostTokenString, guestTokenString)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -438,9 +438,12 @@ func main() {
 		internalGroup.POST("/loadGame", env.loadGame)
 	}
 
+	// TODO: user middleware function to send redirect if game on different server (use e.matches, not sql)
+	// if redirect needed, call SQL and return host address
+	// will need c.Abort() after redirect response
 	gameGroup := router.Group("/internal", env.checkSecret)
 	{
-		gameGroup.GET("/game", env.getGame)
+		gameGroup.GET("/game", env.getMatch)
 	}
 
 	router.Run(webServerHost + ":" + webServerPort)
