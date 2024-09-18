@@ -2,7 +2,7 @@ package main
 
 import "github.com/gin-gonic/gin"
 
-type presentableGameState struct {
+type censoredGameState struct {
 	Board *Board `json:"board"`
 	Evens PlayerType `json:"firstPlayer"`
 	Moves []*Move `json:"moves"`
@@ -10,8 +10,18 @@ type presentableGameState struct {
 
 func (e *env) getGame(_ *gin.Context) {
 
-	// get gameid, token
+	// get token
 	// token must be one of tokens in match, which should be in e.matches
-	// only return current player's board
+	// return game ID
+	return
+}
+
+func (e *env) getGameState(_ *gin.Context) {
+
+	// get game ID from matches
+
+	// get token
+	// token must be one of tokens in match, which should be in e.matches
+	// return game ID
 	return
 }

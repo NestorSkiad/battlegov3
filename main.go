@@ -240,7 +240,8 @@ func (e *env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	_, err = e.db.Exec(context.Background(), "INSERT INTO games (uuid, player_one, player_two, host_addr) VALUES ($1, $2, $3, $4)", uuid.New().String(), hostToken.String(), guestToken.String(), hostAddrString)
+	matchID := uuid.New()
+	_, err = e.db.Exec(context.Background(), "INSERT INTO games (uuid, player_one, player_two, host_addr) VALUES ($1, $2, $3, $4)", matchID.String(), hostToken.String(), guestToken.String(), hostAddrString)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -258,7 +259,6 @@ func (e *env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	matchID := uuid.New()
 	gs, err := newGameState()
 
 	if err != nil {
@@ -266,8 +266,7 @@ func (e *env) joinMatch(c *gin.Context) {
 	}
 
 	e.matches.Store(matchID, match{HostToken: hostToken, GuestToken: guestToken, GameState: gs})
-
-	// respond with OK, message to enter game logic, include match ID
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "successfully joined game", "matchID": matchID.String()})
 
 	// TODO: rest of game logic
 	// add list to match
@@ -429,7 +428,7 @@ func main() {
 	router := gin.Default()
 
 	router.POST("/user/:username", env.postUsers)
-	router.POST("/extendSession/:token", env.extendSessionRequest) //FIXME: forms, not URI parameters
+	router.POST("/extendSession/:token", env.extendSessionRequest)
 	router.POST("/joinMatch/:token", env.joinMatch)
 	router.POST("/hostMatch/:token", env.hostMatch)
 	router.DELETE("/hostmatch/:token", env.unhostMatch)
