@@ -213,7 +213,7 @@ func (e *env) joinMatch(c *gin.Context) {
 		return
 	}
 
-	var hostTokenString, hostAddrString, hostPortString string
+	var hostTokenString, hostAddrString string
 	err = e.db.QueryRow(context.Background(), `
 		SELECT
 			t.token,
@@ -226,7 +226,7 @@ func (e *env) joinMatch(c *gin.Context) {
 			AND us.username = t.username
 		ORDER BY RANDOM()
 		LIMIT 1
-		`, "hosting").Scan(&hostTokenString, &hostAddrString, &hostPortString)
+		`, "hosting").Scan(&hostTokenString, &hostAddrString)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 		return
@@ -248,7 +248,7 @@ func (e *env) joinMatch(c *gin.Context) {
 	}
 
 	if hostAddrString != webServerHost {
-		resp, err := http.Get("http://" + hostAddrString)
+		resp, err := http.Get("http://" + hostAddrString + "/loadGame" + "/?" + "game_id=" + matchID.String())
 		if err != nil || resp.StatusCode != http.StatusOK {
 			c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "internal communication error"})
 			return
@@ -273,7 +273,6 @@ func (e *env) joinMatch(c *gin.Context) {
 	// one user gets allowed during even turns, the other during odds
 	// make a group to handle game requests
 	// match functions should run as match dot something dot functions
-	// squash the errors first though
 }
 
 func (e *env) hostMatch(c *gin.Context) {

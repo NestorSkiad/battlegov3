@@ -22,6 +22,7 @@ func (e *env) getMatch(c *gin.Context) {
 	}
 
 	var matchID string
+	var hostAddr string
 	err = e.db.QueryRow(context.Background(),`
 		SELECT
 			g.game_id
@@ -40,7 +41,7 @@ func (e *env) getMatch(c *gin.Context) {
 			) AND
 			($1 = g.player_one OR
 			$1 = g.player_two)
-	`, userToken.String()).Scan(matchID)
+	`, userToken.String()).Scan(matchID, hostAddr)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "User not in playing state."})
@@ -51,9 +52,12 @@ func (e *env) getMatch(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
 	}
 
-	// if host doesn't match, send match id and redirect
-	// if it does, send ok and match id
-	return
+	if hostAddr != webServerHost {
+		c.IndentedJSON(http.StatusFound, gin.H{"message": "redirect requests to host server", "location": "http://" + hostAddr, "game_id": matchID})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "you are talking to the host server", "game_id": matchID})
 }
 
 func (e *env) getGameState(_ *gin.Context) {
