@@ -50,6 +50,7 @@ func (e *env) getMatch(c *gin.Context) {
 
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
+		return
 	}
 
 	if hostAddr != webServerHost {
@@ -61,11 +62,7 @@ func (e *env) getMatch(c *gin.Context) {
 }
 
 func (e *env) getGameState(_ *gin.Context) {
-
-	// get match ID from matches
-
-	// get token
-	// token must be one of tokens in match, which should be in e.matches
-	// return match ID
+	// given token and match id
+	// 
 	return
 }
