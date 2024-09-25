@@ -35,7 +35,7 @@ type env struct {
 	matches *sync.Map
 }
 
-type match struct {
+type Match struct {
 	HostToken, GuestToken uuid.UUID
 	GameState             *GameState
 }
@@ -265,7 +265,7 @@ func (e *env) joinMatch(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "could not create game state"})
 	}
 
-	e.matches.Store(matchID, match{HostToken: hostToken, GuestToken: guestToken, GameState: gs})
+	e.matches.Store(matchID, Match{HostToken: hostToken, GuestToken: guestToken, GameState: gs})
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "successfully joined game", "matchID": matchID.String()})
 
 	// TODO: rest of game logic
@@ -389,7 +389,7 @@ func (e *env) loadGame(c *gin.Context) {
 	hostToken, _ := uuid.Parse(hostTokenString)
 	guestToken, _ := uuid.Parse(guestTokenString)
 
-	e.matches.Store(gameID, match{HostToken: hostToken, GuestToken: guestToken})
+	e.matches.Store(gameID, Match{HostToken: hostToken, GuestToken: guestToken})
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "match successfully stored in memory"})
 }
 
