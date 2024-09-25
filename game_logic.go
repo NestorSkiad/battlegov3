@@ -40,40 +40,41 @@ type PlayerType int
 const (
 	Host PlayerType = iota
 	Guest
+	NoneWinner
 )
 
 var players = []PlayerType{Host, Guest}
 
 // Ship in Battleship
 type Ship struct {
-	Startx int `json:"startx"`
-	Starty int	`json:"starty"`
-	Endx int `json:"endx"`
-	Endy int `json:"endy"`
-	Dir Direction `json:"direction"`
-	Alive bool `json:"alive"`
+	Startx int       `json:"startx"`
+	Starty int       `json:"starty"`
+	Endx   int       `json:"endx"`
+	Endy   int       `json:"endy"`
+	Dir    Direction `json:"direction"`
+	Alive  bool      `json:"alive"`
 }
 
 // Board abstraction, with dimensions and ships
 type Board struct {
-	W int `json:"width"`
-	H  int `json:"height"`
+	W     int     `json:"width"`
+	H     int     `json:"height"`
 	Ships []*Ship `json:"ships"`
 }
 
 // Move made by a player
 type Move struct {
-	X int `json:"x"`
-	Y int `json:"y"`
+	X   int  `json:"x"`
+	Y   int  `json:"y"`
 	Hit bool `json:"hit"`
 }
 
 // GameState represents a game
 type GameState struct {
-	boardHost *Board
+	boardHost  *Board
 	boardGuest *Board
-	evens PlayerType
-	moves []*Move
+	evens      PlayerType
+	moves      []*Move
 }
 
 // implement presentablegamestate struct, as in https://github.com/gin-gonic/gin/issues/715#issuecomment-381302094
@@ -98,9 +99,8 @@ func newGameState() (*GameState, error) {
 	gs.boardGuest = boardGuest
 
 	gs.evens = players[rand.Intn(len(players))]
-
 	gs.moves = []*Move{}
-	
+
 	return gs, nil
 }
 
@@ -115,7 +115,7 @@ func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 	} else {
 		targetBoard = g.boardHost
 	}
-	
+
 	if x >= targetBoard.W || y >= targetBoard.H {
 		return false, errors.New("hit is out of bounds")
 	}
@@ -130,11 +130,24 @@ func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 	g.moves = append(g.moves, move)
 	return move.Hit, nil
 }
+
 // make function to see if any ships are left
 // call function in makemove API command whatever after tryHit
 
-func (g *GameState) toPresentable() error {
-	return nil
+func (g *GameState) toPresentable(p PlayerType) *CensoredGameState {
+	cgs := &CensoredGameState{}
+
+	switch p {
+	case Host:
+		cgs.Board = g.boardHost
+	case Guest:
+		cgs.Board = g.boardGuest
+	}
+
+	cgs.Evens = g.evens
+	cgs.Moves = g.moves
+
+	return cgs
 }
 
 func getEndCoords(startx, starty, boardx, boardy, length int, dir Direction) (int, int, error) {
@@ -218,5 +231,5 @@ func newBoardFromRandom(dim int) (*Board, error) {
 		// make addship function to abstract adding ships a bit, especially if I do the matrix-referencing-boats thing
 	}
 
-	return board, nil;
+	return board, nil
 }

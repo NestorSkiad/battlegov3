@@ -38,6 +38,7 @@ type env struct {
 type Match struct {
 	HostToken, GuestToken uuid.UUID
 	GameState             *GameState
+	Winner 				  PlayerType
 }
 
 type user struct {
@@ -265,7 +266,7 @@ func (e *env) joinMatch(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": "could not create game state"})
 	}
 
-	e.matches.Store(matchID, Match{HostToken: hostToken, GuestToken: guestToken, GameState: gs})
+	e.matches.Store(matchID, Match{HostToken: hostToken, GuestToken: guestToken, GameState: gs, Winner: NoneWinner})
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "successfully joined game", "matchID": matchID.String()})
 
 	// TODO: rest of game logic

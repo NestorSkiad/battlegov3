@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type censoredGameState struct {
+type CensoredGameState struct {
 	Board *Board     `json:"board"`
 	Evens PlayerType `json:"firstPlayer"`
 	Moves []*Move    `json:"moves"`
@@ -80,7 +80,7 @@ func (e *env) getGameState(c *gin.Context) {
 		return
 	}
 
-	// put match in var, validate token again but with match tokens
+	// TODO: turn this until before censoredGameState into own functions or middleware
 	var match *Match
 	matchUncast, ok := e.matches.Load(matchTokenUUID)
 	if !ok {
@@ -101,9 +101,7 @@ func (e *env) getGameState(c *gin.Context) {
 		return
 	}
 
-	// need toPresentable
+	censoredGameState := match.GameState.toPresentable(p)
 
-	// given token and match id
-	//
-	return
+	c.IndentedJSON(http.StatusOK, *censoredGameState)
 }
