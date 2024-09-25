@@ -105,6 +105,10 @@ func newGameState() (*GameState, error) {
 }
 
 func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
+	if mod := len(g.moves) % 2; (g.evens == p && mod == 1) || (g.evens != p && mod == 0) {
+		return false, errors.New("incorrect player order")
+	}
+
 	var targetBoard *Board
 	if p == Host {
 		targetBoard = g.boardGuest
@@ -116,13 +120,18 @@ func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 		return false, errors.New("hit is out of bounds")
 	}
 
-	// make move
-	// check if hit
-	// if hit, kill corresponding ship
-	// add move to moves list
+	move := &Move{x, y, false}
+	ship, exists := targetBoard.shipAtCoords(x, y)
+	if exists {
+		ship.Alive = false
+		move.Hit = true
+	}
 
-	return false, nil
+	g.moves = append(g.moves, move)
+	return move.Hit, nil
 }
+// make function to see if any ships are left
+// call function in makemove API command whatever after tryHit
 
 func (g *GameState) toPresentable() error {
 	return nil
@@ -175,17 +184,17 @@ func (board *Board) addShip(ship *Ship) error {
 	return nil
 }
 
-func (board *Board) shipAtCoords(x, y int) bool {
+func (board *Board) shipAtCoords(x, y int) (*Ship, bool) {
 	if (x >= board.W) || (y >= board.H) {
-		return false
+		return nil, false
 	}
 
 	for _, ship := range board.Ships {
 		if (x >= ship.Startx) && (x <= ship.Endx) && (y >= ship.Starty) && (y <= ship.Endy) {
-			return true
+			return ship, true
 		}
 	}
-	return false
+	return nil, false
 }
 
 func newBoardFromRandom(dim int) (*Board, error) {
