@@ -26,8 +26,6 @@ func (m Matrix[T]) Set(x, y int, t T) {
 // Direction of where the ship points
 type Direction int
 
-// FIXME: this won't work. convert to horizontal/vertical
-// Ship directionality values
 const (
 	Horizontal Direction = iota
 	Vertical
@@ -106,7 +104,27 @@ func newGameState() (*GameState, error) {
 	return gs, nil
 }
 
-func (m *GameState) makeMove() error {
+func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
+	var targetBoard *Board
+	if p == Host {
+		targetBoard = g.boardGuest
+	} else {
+		targetBoard = g.boardHost
+	}
+	
+	if x >= targetBoard.W || y >= targetBoard.H {
+		return false, errors.New("hit is out of bounds")
+	}
+
+	// make move
+	// check if hit
+	// if hit, kill corresponding ship
+	// add move to moves list
+
+	return false, nil
+}
+
+func (g *GameState) toPresentable() error {
 	return nil
 }
 
