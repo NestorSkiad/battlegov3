@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// CensoredGameState contains all information in gameState,
+// but only one board. Use gameState.toCensored()
 type CensoredGameState struct {
 	Board *Board     `json:"board"`
 	Evens PlayerType `json:"firstPlayer"`
@@ -101,7 +103,7 @@ func (e *env) getGameState(c *gin.Context) {
 		return
 	}
 
-	censoredGameState := match.GameState.toPresentable(p)
+	censoredGameState := match.GameState.toCensored(p)
 
 	c.IndentedJSON(http.StatusOK, *censoredGameState)
 }

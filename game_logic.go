@@ -134,7 +134,7 @@ func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 // make function to see if any ships are left
 // call function in makemove API command whatever after tryHit
 
-func (g *GameState) toPresentable(p PlayerType) *CensoredGameState {
+func (g *GameState) toCensored(p PlayerType) *CensoredGameState {
 	cgs := &CensoredGameState{}
 
 	switch p {
