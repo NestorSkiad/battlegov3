@@ -5,6 +5,7 @@ import (
 	"math/rand"
 )
 
+/*
 // possible use: secondary index for Boat pointers (won't have to linear check for boats given coords)
 type Matrix[T any] struct {
 	w, h int
@@ -21,11 +22,13 @@ func (m Matrix[T]) At(x, y int) T {
 
 func (m Matrix[T]) Set(x, y int, t T) {
 	m.data[y*m.w+x] = t
-}
+}*/
 
 // Direction of where the ship points
 type Direction int
 
+// Horizontal or Vertical. No point in compass directions,
+// might as well do them arbitrarily on the client side.
 const (
 	Horizontal Direction = iota
 	Vertical
@@ -104,6 +107,8 @@ func newGameState() (*GameState, error) {
 	return gs, nil
 }
 
+//func (g *GameState)
+
 func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 	if mod := len(g.moves) % 2; (g.evens == p && mod == 1) || (g.evens != p && mod == 0) {
 		return false, errors.New("incorrect player order")
@@ -131,7 +136,24 @@ func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 	return move.Hit, nil
 }
 
-// make function to see if any ships are left
+func (g *GameState) anyAliveEnemy(p PlayerType) (bool, error) {
+	var targetBoard *Board
+	if p == Host {
+		targetBoard = g.boardHost
+	} else {
+		targetBoard = g.boardGuest
+	}
+
+	for _, ship := range targetBoard.Ships {
+		if ship.Alive {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// make function to see if any ships are alive
 // call function in makemove API command whatever after tryHit
 
 func (g *GameState) toCensored(p PlayerType) *CensoredGameState {
