@@ -429,10 +429,10 @@ func main() {
 		internalGroup.POST("/loadGame", env.loadGame)
 	}
 
-	gameGroup := router.Group("/game")
+	gameGroup := router.Group("/game", env.playAuth)
 	{
-		gameGroup.GET("/play", env.playAuth, env.getMatch)
-		gameGroup.POST("/play", env.playAuth, env.postMove)
+		gameGroup.GET("/play", env.getMatch)
+		gameGroup.POST("/play", env.postMove)
 		// TODO: forfeit function
 	}
 
