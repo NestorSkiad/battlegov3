@@ -201,10 +201,7 @@ func (e *env) extendSessionRequest(c *gin.Context) {
 }
 
 func (e *env) joinMatch(c *gin.Context) {
-	guestToken, err := e.extendSession(c)
-	if err != nil {
-		return
-	}
+	guestToken := c.MustGet("token").(uuid.UUID)
 
 	rows, _ := e.db.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_status = $1", "hosting")
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
@@ -281,10 +278,7 @@ func (e *env) joinMatch(c *gin.Context) {
 }
 
 func (e *env) hostMatch(c *gin.Context) {
-	token, err := e.extendSession(c)
-	if err != nil {
-		return
-	}
+	token := c.MustGet("token").(uuid.UUID)
 
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
@@ -322,10 +316,7 @@ func (e *env) hostMatch(c *gin.Context) {
 }
 
 func (e *env) unhostMatch(c *gin.Context) {
-	token, err := e.extendSession(c)
-	if err != nil {
-		return
-	}
+	token := c.MustGet("token").(uuid.UUID)
 
 	tx, err := e.db.Begin(context.Background())
 	if err != nil {
@@ -335,7 +326,7 @@ func (e *env) unhostMatch(c *gin.Context) {
 
 	defer tx.Rollback(context.Background())
 
-	rows, _ := tx.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_token = $1 AND user_status IN ($2, $3)", token.String(), "idle", "playing")
+	rows, _ := tx.Query(context.Background(), "SELECT COUNT(*) FROM user_status WHERE user_token = $1 AND user_status != $2", token.String(), "hosting")
 	matches, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, sqlErrorMessage)
@@ -343,7 +334,7 @@ func (e *env) unhostMatch(c *gin.Context) {
 	}
 
 	if matches == 1 {
-		c.IndentedJSON(http.StatusConflict, gin.H{"message": "user was not hosting"})
+		c.IndentedJSON(http.StatusConflict, gin.H{"message": "user is not hosting"})
 		return
 	}
 
@@ -429,19 +420,20 @@ func main() {
 
 	router.POST("/user/:username", env.postUsers)
 	router.POST("/extendSession", env.userAuth, env.extendSessionRequest)
-	router.POST("/joinMatch", env.joinMatch)
-	router.POST("/hostMatch", env.hostMatch)
-	router.DELETE("/hostmatch", env.unhostMatch)
+	router.POST("/joinMatch", env.userAuth, env.joinMatch)
+	router.POST("/hostMatch", env.userAuth, env.hostMatch)
+	router.DELETE("/hostmatch", env.userAuth, env.unhostMatch)
 
 	internalGroup := router.Group("/internal", env.checkSecret)
 	{
 		internalGroup.POST("/loadGame", env.loadGame)
 	}
 
-	gameGroup := router.Group("/internal")
+	gameGroup := router.Group("/game")
 	{
-		gameGroup.GET("/game", env.playAuth, env.getMatch)
-		gameGroup.POST("/game", env.playAuth, env.postMove)
+		gameGroup.GET("/play", env.playAuth, env.getMatch)
+		gameGroup.POST("/play", env.playAuth, env.postMove)
+		// TODO: forfeit function
 	}
 
 	router.Run(webServerHost + ":" + webServerPort)
