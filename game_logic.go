@@ -107,19 +107,19 @@ func newGameState() (*GameState, error) {
 	return gs, nil
 }
 
-//func (g *GameState)
+func (g *GameState) getTargetBoard(p PlayerType) (*Board) {
+	if p == Host {
+		return g.boardGuest
+	}
+	return g.boardHost
+}
 
 func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 	if mod := len(g.moves) % 2; (g.evens == p && mod == 1) || (g.evens != p && mod == 0) {
 		return false, errors.New("incorrect player order")
 	}
 
-	var targetBoard *Board
-	if p == Host {
-		targetBoard = g.boardGuest
-	} else {
-		targetBoard = g.boardHost
-	}
+	targetBoard := g.getTargetBoard(p)
 
 	if x >= targetBoard.W || y >= targetBoard.H {
 		return false, errors.New("hit is out of bounds")
@@ -137,12 +137,7 @@ func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
 }
 
 func (g *GameState) anyAliveEnemy(p PlayerType) (bool, error) {
-	var targetBoard *Board
-	if p == Host {
-		targetBoard = g.boardHost
-	} else {
-		targetBoard = g.boardGuest
-	}
+	targetBoard := g.getTargetBoard(p)
 
 	for _, ship := range targetBoard.Ships {
 		if ship.Alive {
