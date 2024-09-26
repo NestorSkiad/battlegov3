@@ -65,7 +65,7 @@ func (e *env) getMatch(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "you are talking to the host server", "game_id": matchID})
 }
 
-func (e *env) getGameState(c *gin.Context) {
+func (e *env) playAuth(c *gin.Context) {
 	userToken, err := e.extendSession(c)
 	if err != nil {
 		return
@@ -74,12 +74,14 @@ func (e *env) getGameState(c *gin.Context) {
 	matchTokenString, exists := c.GetPostForm("match_id")
 	if !exists || matchTokenString == "" {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no match token supplied"})
+		c.Abort()
 		return
 	}
 
 	matchTokenUUID, err := uuid.Parse(matchTokenString)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "match token not UUID"})
+		c.Abort()
 		return
 	}
 
@@ -88,6 +90,7 @@ func (e *env) getGameState(c *gin.Context) {
 	matchUncast, ok := e.matches.Load(matchTokenUUID)
 	if !ok {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "could not retrieve match from memory"})
+		c.Abort()
 		return
 	}
 
@@ -101,53 +104,23 @@ func (e *env) getGameState(c *gin.Context) {
 		p = Guest
 	default:
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "player not in match"})
-		return
+		c.Abort()
 	}
 
-	censoredGameState := match.GameState.toCensored(p)
+	c.Set("match", match)
+	c.Set("playerType", p)
+}
 
+func (e *env) getGameState(c *gin.Context) {
+	match := c.MustGet("match").(*Match)
+	p := c.MustGet("playerType").(PlayerType)
+	censoredGameState := match.GameState.toCensored(p)
 	c.IndentedJSON(http.StatusOK, *censoredGameState)
 }
 
 func (e *env) postMove(c *gin.Context) {
-	userToken, err := e.extendSession(c)
-	if err != nil {
-		return
-	}
-
-	matchTokenString, exists := c.GetPostForm("match_id")
-	if !exists || matchTokenString == "" {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "no match token supplied"})
-		return
-	}
-
-	matchTokenUUID, err := uuid.Parse(matchTokenString)
-	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "match token not UUID"})
-		return
-	}
-
-	// TODO: turn this until before censoredGameState into own functions or middleware
-	// needs to return player type, match pointer
-	var match *Match
-	matchUncast, ok := e.matches.Load(matchTokenUUID)
-	if !ok {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "could not retrieve match from memory"})
-		return
-	}
-
-	match = matchUncast.(*Match)
-
-	var p PlayerType
-	switch userToken {
-	case match.HostToken:
-		p = Host
-	case match.GuestToken:
-		p = Guest
-	default:
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "player not in match"})
-		return
-	}
+	match := c.MustGet("match").(*Match)
+	p := c.MustGet("playerType").(PlayerType)
 
 	xString, exists := c.GetPostForm("x")
 	if !exists {

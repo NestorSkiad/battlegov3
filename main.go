@@ -438,12 +438,10 @@ func main() {
 		internalGroup.POST("/loadGame", env.loadGame)
 	}
 
-	// TODO: user middleware function to send redirect if game on different server (use e.matches, not sql)
-	// if redirect needed, call SQL and return host address
-	// will need c.Abort() after redirect response
-	gameGroup := router.Group("/internal", env.checkSecret)
+	gameGroup := router.Group("/internal")
 	{
-		gameGroup.GET("/game", env.getMatch)
+		gameGroup.GET("/game", env.playAuth, env.getMatch)
+		gameGroup.POST("/game", env.playAuth, env.postMove)
 	}
 
 	router.Run(webServerHost + ":" + webServerPort)
