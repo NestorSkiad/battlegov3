@@ -107,14 +107,14 @@ func newGameState() (*GameState, error) {
 	return gs, nil
 }
 
-func (g *GameState) getTargetBoard(p PlayerType) (*Board) {
+func (g *GameState) getTargetBoard(p PlayerType) *Board {
 	if p == Host {
 		return g.boardGuest
 	}
 	return g.boardHost
 }
 
-func (g *GameState) tryHit(x, y int, p PlayerType) (bool, error) {
+func (g *GameState) tryHitEnemy(x, y int, p PlayerType) (bool, error) {
 	if mod := len(g.moves) % 2; (g.evens == p && mod == 1) || (g.evens != p && mod == 0) {
 		return false, errors.New("incorrect player order")
 	}
