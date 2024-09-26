@@ -20,14 +20,11 @@ type CensoredGameState struct {
 }
 
 func (e *env) getMatch(c *gin.Context) {
-	userToken, err := e.extendSession(c)
-	if err != nil {
-		return
-	}
+	userToken := c.MustGet("token").(uuid.UUID)
 
 	var matchID string
 	var hostAddr string
-	err = e.db.QueryRow(context.Background(), `
+	err := e.db.QueryRow(context.Background(), `
 		SELECT
 			g.game_id
 			g.host_addr
@@ -66,10 +63,7 @@ func (e *env) getMatch(c *gin.Context) {
 }
 
 func (e *env) playAuth(c *gin.Context) {
-	userToken, err := e.extendSession(c)
-	if err != nil {
-		return
-	}
+	userToken := c.MustGet("token").(uuid.UUID)
 
 	matchTokenString, exists := c.GetPostForm("match_id")
 	if !exists || matchTokenString == "" {
