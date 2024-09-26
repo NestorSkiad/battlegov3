@@ -171,12 +171,19 @@ func (e *env) postMove(c *gin.Context) {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "y not an integer"})
 	}
 
-	res, err := match.GameState.tryHitEnemy(x, y, p)
+	hit, err := match.GameState.tryHitEnemy(x, y, p)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+	}
 
-	//check if winner
-	// if not return below
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "move registered", "hit": res})
+	if hit {
+		matchDone := match.GameState.anyAliveEnemy(p)
 
-	// if yes, return win message, launch thread to delete match from matches and update SQL in 10 minutes
-	// todo: check if winner
+		if matchDone {
+			c.IndentedJSON(http.StatusOK, gin.H{"message": "match complete, you won!!!", "hit": hit, "win": true})
+			// TODO: launch thread to delete match from matches and update SQL in 10 minutes
+		}
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "move registered", "hit": hit, "win": false})
 }

@@ -136,16 +136,16 @@ func (g *GameState) tryHitEnemy(x, y int, p PlayerType) (bool, error) {
 	return move.Hit, nil
 }
 
-func (g *GameState) anyAliveEnemy(p PlayerType) (bool, error) {
+func (g *GameState) anyAliveEnemy(p PlayerType) bool {
 	targetBoard := g.getTargetBoard(p)
 
 	for _, ship := range targetBoard.Ships {
 		if ship.Alive {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 // make function to see if any ships are alive
