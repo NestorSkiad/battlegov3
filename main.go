@@ -159,7 +159,6 @@ func (e *env) postUsers(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, gin.H{"token": newu.Token.String(), "message": "user created"})
 }
 
-// TODO: rename to ValidateToken
 func (e *env) extendSession(c *gin.Context) (uuid.UUID, error) {
 	token, exists := c.GetPostForm("token")
 
@@ -188,11 +187,16 @@ func (e *env) extendSession(c *gin.Context) (uuid.UUID, error) {
 	return tokenUUID, err
 }
 
-func (e *env) extendSessionRequest(c *gin.Context) {
-	if _, err := e.extendSession(c); err != nil {
+func (e *env) userAuth(c *gin.Context) {
+	guestToken, err := e.extendSession(c)
+	if err != nil {
+		c.Abort()
 		return
 	}
+	c.Set("token", guestToken)
+}
 
+func (e *env) extendSessionRequest(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "session extended"})
 }
 
@@ -409,10 +413,6 @@ func (e *env) checkSecret(c *gin.Context) {
 	}
 }
 
-func (e *env) initHost() {
-	e.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerAddr)
-}
-
 func main() {
 	dbpool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
@@ -423,15 +423,15 @@ func main() {
 
 	matches := sync.Map{}
 	env := &env{db: dbpool, matches: &matches}
-	go env.initHost() // TODO: error handling for this
+	env.db.Exec(context.Background(), "INSERT INTO hosts (host_addr) VALUES ($1)", webServerAddr)
 
 	router := gin.Default()
 
 	router.POST("/user/:username", env.postUsers)
-	router.POST("/extendSession/:token", env.extendSessionRequest)
-	router.POST("/joinMatch/:token", env.joinMatch)
-	router.POST("/hostMatch/:token", env.hostMatch)
-	router.DELETE("/hostmatch/:token", env.unhostMatch)
+	router.POST("/extendSession", env.userAuth, env.extendSessionRequest)
+	router.POST("/joinMatch", env.joinMatch)
+	router.POST("/hostMatch", env.hostMatch)
+	router.DELETE("/hostmatch", env.unhostMatch)
 
 	internalGroup := router.Group("/internal", env.checkSecret)
 	{
