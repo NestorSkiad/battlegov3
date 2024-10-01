@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS games (
     PRIMARY KEY(game_id)
 );
 
+CREATE TABLE IF NOT EXISTS game_history (
+    player REFERENCES tokens(token) ON DELETE CASCADE,
+    game_id uuid,
+    won boolean,
+    PRIMARY KEY(player)
+);
+
 -- if I do busy logic, add status field here
 -- busy logic =: thread checks server status every few minutes, sets status based on metrics
 -- when user tries to host, if server is busy, redirect to random non-busy server
