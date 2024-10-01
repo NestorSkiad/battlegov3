@@ -133,16 +133,19 @@ func (e *env) postMove(c *gin.Context) {
 	x, err := strconv.Atoi(xString)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "x not an integer"})
+		return
 	}
 
 	y, err := strconv.Atoi(yString)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": "y not an integer"})
+		return
 	}
 
 	hit, err := match.GameState.tryHitEnemy(x, y, p)
 	if err != nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
 	}
 
 	if hit && !match.GameState.anyAliveEnemy(p) {
@@ -151,6 +154,7 @@ func (e *env) postMove(c *gin.Context) {
 			time.Sleep(10 * time.Minute)
 			e.matchCleanup(c.MustGet("matchToken").(uuid.UUID))
 			}()
+		return
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "move registered", "hit": hit, "win": false})
