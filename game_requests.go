@@ -147,14 +147,17 @@ func (e *env) postMove(c *gin.Context) {
 
 	if hit && !match.GameState.anyAliveEnemy(p) {
 		c.IndentedJSON(http.StatusOK, gin.H{"message": "match complete, you won!!!", "hit": hit, "win": true})
-		go e.matchCleanup(c.MustGet("matchToken").(uuid.UUID))
+		go func(){
+			time.Sleep(10 * time.Minute)
+			e.matchCleanup(c.MustGet("matchToken").(uuid.UUID))
+			}()
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "move registered", "hit": hit, "win": false})
 }
 
+// reuse in forfeit
 func (e *env) matchCleanup(matchID uuid.UUID) {
-	time.Sleep(10 * time.Minute)
 	var match *Match
 	matchUncast, loaded := e.matches.LoadAndDelete(matchID)
 	if !loaded {

@@ -269,12 +269,6 @@ func (e *env) joinMatch(c *gin.Context) {
 
 	e.matches.Store(matchID, Match{HostToken: hostToken, GuestToken: guestToken, GameState: gs, Winner: NoneWinner})
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "successfully joined game", "matchID": matchID.String()})
-
-	// TODO: rest of game logic
-	// add list to match
-	// one user gets allowed during even turns, the other during odds
-	// make a group to handle game requests
-	// match functions should run as match dot something dot functions
 }
 
 func (e *env) hostMatch(c *gin.Context) {
