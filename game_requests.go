@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -103,6 +104,7 @@ func (e *env) playAuth(c *gin.Context) {
 
 	c.Set("match", match)
 	c.Set("playerType", p)
+	c.Set("matchToken", matchTokenUUID)
 }
 
 func (e *env) getGameState(c *gin.Context) {
@@ -143,14 +145,36 @@ func (e *env) postMove(c *gin.Context) {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 	}
 
-	if hit {
-		matchDone := match.GameState.anyAliveEnemy(p)
-
-		if matchDone {
-			c.IndentedJSON(http.StatusOK, gin.H{"message": "match complete, you won!!!", "hit": hit, "win": true})
-			// TODO: launch thread to delete match from matches and update SQL in 10 minutes
-		}
+	if hit && !match.GameState.anyAliveEnemy(p) {
+		c.IndentedJSON(http.StatusOK, gin.H{"message": "match complete, you won!!!", "hit": hit, "win": true})
+		go e.matchCleanup(c.MustGet("matchToken").(uuid.UUID))
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "move registered", "hit": hit, "win": false})
+}
+
+func (e *env) matchCleanup(matchID uuid.UUID) {
+	time.Sleep(10 * time.Minute)
+	var match *Match
+	matchUncast, loaded := e.matches.LoadAndDelete(matchID)
+	if !loaded {
+		return
+	}
+	match = matchUncast.(*Match)
+	
+	tx, _ := e.db.Begin(context.Background())
+	defer tx.Rollback(context.Background())
+
+	var hostwin bool
+	if match.Winner == Host {
+		hostwin = true
+	} else {
+		hostwin = false
+	}
+
+	tx.Exec(context.Background(), "INSERT INTO game_history (player, game_id, won) values ($1, $2, $3)", match.HostToken.String(), matchID.String(), hostwin)
+	tx.Exec(context.Background(), "INSERT INTO game_history (player, game_id, won) values ($1, $2, $3)", match.GuestToken.String(), matchID.String(), !hostwin)
+	tx.Exec(context.Background(), "DELETE FROM games WHERE game_id=$1", matchID.String())
+
+	tx.Commit(context.Background())
 }

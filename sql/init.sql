@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS game_history (
     player REFERENCES tokens(token) ON DELETE CASCADE,
     game_id uuid,
     won boolean,
-    PRIMARY KEY(player)
+    PRIMARY KEY(player),
+    UNIQUE(player, game_id)
 );
 
 -- if I do busy logic, add status field here
