@@ -161,6 +161,7 @@ func (e *env) postMove(c *gin.Context) {
 }
 
 // reuse in forfeit
+// TODO: logging
 func (e *env) matchCleanup(matchID uuid.UUID) {
 	var match *Match
 	matchUncast, loaded := e.matches.LoadAndDelete(matchID)
